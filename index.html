@@ -868,6 +868,20 @@ const CAREER_TRACKS = {
       { career:+20, wealth:+15, happy:+10 },
     ],
   },
+  diplomat: {
+    name: '外交线',
+    levels: ['随员', '三等秘书', '二等秘书', '一等秘书', '参赞', '公使', '大使'],
+    promoNeed: [0, 10, 22, 38, 58, 85, 120],
+    levelBonus: [
+      {},
+      { career:+6, smart:+5 },
+      { career:+8, smart:+5, wealth:+3 },
+      { career:+8, smart:+6, wealth:+5, happy:+3 },
+      { career:+10, smart:+8, wealth:+8, happy:+3 },
+      { career:+12, smart:+8, wealth:+10, happy:+5 },
+      { career:+18, smart:+10, wealth:+12, happy:+8 },
+    ],
+  },
   startup: {
     name: '创业线',
     levels: ['小作坊老板', '天使轮创始人', 'A轮CEO', 'B轮CEO', 'C轮CEO', '独角兽掌门人', '上市公司董事长'],
@@ -928,6 +942,7 @@ const GRADUATE_PATHS = {
     desc: '进入体制，为人民服务',
     effects: { career:+3, wealth:+5, happy:+18, smart:+5 },
     track: 'civil',
+    diplomatChance: 0.35,  // 隐藏：外交部岗位
   },
   startup: {
     label: '直接创业',
@@ -945,6 +960,45 @@ const GRADUATE_PATHS = {
   },
 };
 
+// ===== 外交官系统 =====
+const POSTING_COUNTRIES = [
+  { name:'厄立特里亚', flag:'🇪🇷', desc:'非洲之角的神秘国度，条件艰苦但历练拉满', hardship:true },
+  { name:'法国', flag:'🇫🇷', desc:'塞纳河畔的浪漫与外交场的觥筹交错' },
+  { name:'美国', flag:'🇺🇸', desc:'大国博弈第一线，压力与机遇并存' },
+  { name:'日本', flag:'🇯🇵', desc:'一衣带水的邻邦，细节控的修罗场' },
+  { name:'肯尼亚', flag:'🇰🇪', desc:'东非门户，中非合作的前沿阵地', hardship:true },
+  { name:'巴西', flag:'🇧🇷', desc:'桑巴与足球之国，南美外交重镇' },
+  { name:'瑞士', flag:'🇨🇭', desc:'日内瓦多边外交的中心舞台' },
+  { name:'埃及', flag:'🇪🇬', desc:'尼罗河畔的文明古国', hardship:true },
+  { name:'俄罗斯', flag:'🇷🇺', desc:'战斗民族的伏特加与漫长寒冬' },
+  { name:'新加坡', flag:'🇸🇬', desc:'花园城市，东南亚外交枢纽' },
+  { name:'阿根廷', flag:'🇦🇷', desc:'探戈与牛排，地球另一端的老朋友', hardship:true },
+  { name:'意大利', flag:'🇮🇹', desc:'亚平宁半岛的美食与艺术' },
+];
+const LOCAL_PARTNER_NAMES = {
+  '厄立特里亚': ['Selam','Awet','Luwam','Daniel'],
+  '法国': ['Camille','Louis','Chloé','Antoine'],
+  '美国': ['Emily','Michael','Grace','Ryan'],
+  '日本': ['结衣','翔太','美咲','拓海'],
+  '肯尼亚': ['Amani','Baraka','Zuri','Jabari'],
+  '巴西': ['Isabela','Thiago','Larissa','Mateus'],
+  '瑞士': ['Lena','Luca','Mia','Noah'],
+  '埃及': ['Layla','Omar','Nour','Karim'],
+  '俄罗斯': ['Anastasia','Dmitri','Katya','Ivan'],
+  '新加坡': ['Wei Ling','Jun Hao','Hui Min','Kai'],
+  '阿根廷': ['Valentina','Mateo','Sofía','Santiago'],
+  '意大利': ['Giulia','Marco','Francesca','Alessandro'],
+};
+
+function pickPostingCountry() {
+  // 第一次外派：厄立特里亚概率拉满（50%）
+  if (state.postings.length === 0 && Math.random() < 0.5) {
+    return POSTING_COUNTRIES[0];
+  }
+  const pool = POSTING_COUNTRIES.filter(c => !state.postings.includes(c.name));
+  return pool.length ? pool[Math.floor(Math.random() * pool.length)] : POSTING_COUNTRIES[Math.floor(Math.random() * POSTING_COUNTRIES.length)];
+}
+
 // ===== 恋爱系统数据 =====
 const PARTNER_NAMES = {
   f: ['林晚晚','苏念','沈星河','顾一宁','叶知秋','许温言','江采薇','陆清歌','方语汐','宋知意','唐糖','夏栀'],
@@ -961,6 +1015,14 @@ const MEET_SCENES = ['公司团建','朋友的婚礼','读书会','剧本杀局'
 const SENIOR_MEET_SCENES = ['老年大学书法班','广场舞队','公园晨练','社区合唱团','门球场'];
 
 function makePartner(senior) {
+  // 驻外期间：70% 概率遇到当地人
+  if (state.abroad && LOCAL_PARTNER_NAMES[state.abroad] && Math.random() < 0.7) {
+    const names = LOCAL_PARTNER_NAMES[state.abroad];
+    const name = names[Math.floor(Math.random() * names.length)];
+    const tag = PARTNER_TAGS[Math.floor(Math.random() * PARTNER_TAGS.length)];
+    const country = POSTING_COUNTRIES.find(c => c.name === state.abroad);
+    return { name, tag, scene: `驻${state.abroad}使馆的活动`, senior: !!senior, local: state.abroad, origin: state.abroad, flag: country ? country.flag : '🌍' };
+  }
   const gender = Math.random() < 0.5 ? 'f' : 'm';
   const name = PARTNER_NAMES[gender][Math.floor(Math.random() * PARTNER_NAMES[gender].length)];
   const tag = PARTNER_TAGS[Math.floor(Math.random() * PARTNER_TAGS.length)];
@@ -1007,6 +1069,15 @@ const EVENTS = {
     { icon:'🍵', title:'办公室泡茶哲学', desc:'和老同志学会了泡茶和说话的艺术。', track:'civil', effects:{ smart:+8, happy:+5, promo:+3 } },
     { icon:'📋', title:'借调到上级机关', desc:'被借调到上级单位，视野开阔了。', track:'civil', minAge:26, maxAge:45, effects:{ career:+10, smart:+8, promo:+10 } },
     { icon:'😓', title:'迎检材料写到凌晨', desc:'连续两周加班准备检查材料。', track:'civil', effects:{ happy:-8, career:+3, promo:+3 } },
+    // --- 外交线专属 ---
+    { icon:'🎤', title:'例行记者会救场', desc:'临时顶上发布会翻译，表现稳健，领导记住了你。', track:'diplomat', effects:{ career:+8, smart:+6, promo:+8 } },
+    { icon:'📜', title:'重要会谈记录员', desc:'参与一场高级别会谈的记录工作，见证了历史。', track:'diplomat', effects:{ career:+6, smart:+8, promo:+6 } },
+    { icon:'🍽️', title:'国宴执行小组', desc:'参与筹备一场国宴，细节抠到餐巾折法。', track:'diplomat', effects:{ career:+5, smart:+5, promo:+5, happy:-3 } },
+    { icon:'🗣️', title:'小语种突击', desc:'为了新任务苦学小语种，舌头都捋不直了。', track:'diplomat', effects:{ smart:+10, happy:-3, promo:+4 } },
+    { icon:'🚨', title:'深夜领保电话', desc:'凌晨三点处理同胞求助，通宵协调。', track:'diplomat', require: s => !!s.abroad, effects:{ career:+6, happy:-5, promo:+8 } },
+    { icon:'🤝', title:'侨界联谊会', desc:'组织驻在国侨界活动，办得热热闹闹。', track:'diplomat', require: s => !!s.abroad, effects:{ career:+5, happy:+6, promo:+5 } },
+    { icon:'✍️', title:'调研报告获批示', desc:'你写的驻在国调研报告获得部里批示。', track:'diplomat', require: s => !!s.abroad, effects:{ career:+8, smart:+6, promo:+10 } },
+    { icon:'🏜️', title:'艰苦地区的日常', desc:'停电停水是常态，但你和同事们苦中作乐。', track:'diplomat', require: s => !!s.abroad, effects:{ happy:-4, smart:+5, promo:+6 } },
 
     // --- 创业线专属 ---
     { icon:'💸', title:'融资谈判成功', desc:'新一轮融资敲定，账上又能撑 18 个月。', track:'startup', effects:{ career:+10, wealth:+15, happy:+8, promo:+12 } },
@@ -1342,6 +1413,12 @@ const state = {
   marriedYears: 0,
   spouseTag: null,      // 结婚对象的标签（隐藏结局用）
   seniorLove: false,    // 黄昏恋标记
+  // v3.3 外交官系统
+  abroad: null,         // 当前驻在国名（null=国内）
+  abroadYears: 0,       // 本次外派已满年数
+  homeYears: 0,         // 本次国内已满年数
+  postings: [],         // 历史外派国家
+  spouseLocal: null,    // 跨国伴侣的国籍
 };
 
 const START_BONUS = {
@@ -1449,13 +1526,51 @@ function onGraduatePick(pathKey) {
   state.gradPath = pathKey;
   if (path.hasSubChoice) {
     renderGraduateSub(path);
-  } else {
-    state.track = path.track || 'corporate';
-    if (path.effects) applyStat(path.effects);
-    if (path.ageBonus) state.age += path.ageBonus;
-    state.history.push({ age: state.age, icon: path.icon, text: `毕业选择：${path.label}` });
-    startGame(path);
+    return;
   }
+  // 隐藏支线：考公时有概率被外交部选中
+  if (path.diplomatChance && Math.random() < path.diplomatChance) {
+    state.track = path.track || 'civil';
+    if (path.effects) applyStat(path.effects);
+    $('graduate').classList.remove('active');
+    $('game').classList.add('active');
+    $('displayName').textContent = state.name;
+    $('displayPath').textContent = path.label;
+    updateLevelDisplay();
+    drawWheel();
+    updateDisplay();
+    showEventModal({
+      icon: '🌏',
+      category: '隐藏支线 · 外交官',
+      title: '外交部向你伸出了手',
+      desc: '你的外语和综合成绩过硬，外交部遴选看中了你。进部意味着常年国内外轮岗、艰苦地区外派，但也意味着完全不同的人生。',
+      choices: [
+        { text: 'A. 接受！去看更大的世界', effects: { career:+8, smart:+8, happy:+5 } },
+        { text: 'B. 婉拒，留在地方安稳发展', effects: { happy:+8 } },
+      ],
+      evClass: 'work',
+      onDone: (choiceText, effects) => {
+        applyStat(effects);
+        if (choiceText && choiceText.startsWith('A')) {
+          state.track = 'diplomat';
+          state.homeYears = 0;
+          state.history.push({ age: state.age, icon:'🌏', text:'毕业选择：考入外交部，成为一名随员' });
+          $('displayPath').textContent = '外交官';
+        } else {
+          state.history.push({ age: state.age, icon: path.icon, text: `毕业选择：${path.label}（婉拒了外交部）` });
+        }
+        updateLevelDisplay();
+        renderHistory();
+        updateDisplay();
+      }
+    });
+    return;
+  }
+  state.track = path.track || 'corporate';
+  if (path.effects) applyStat(path.effects);
+  if (path.ageBonus) state.age += path.ageBonus;
+  state.history.push({ age: state.age, icon: path.icon, text: `毕业选择：${path.label}` });
+  startGame(path);
 }
 
 function renderGraduateSub(path) {
@@ -1542,6 +1657,9 @@ function updateLevelDisplay() {
   if (track && $('displayLevel')) {
     $('displayLevel').textContent = track.levels[state.level];
   }
+  if (state.track === 'diplomat' && $('displayPath')) {
+    $('displayPath').textContent = state.abroad ? `外交官·驻${state.abroad}` : '外交官';
+  }
 }
 
 // ===== 进入游戏 =====
@@ -1601,6 +1719,7 @@ function getSectorWeights() {
     corporate: { career: 1.3 },
     academic:  { study: 1.5, career: 1.2 },
     civil:     { social: 1.3, life: 1.2, career: 1.2 },
+    diplomat:  { career: 1.5, study: 1.3, social: 1.2 },
     startup:   { career: 1.4, mystery: 1.3, wealth: 1.2 },
     freelance: { mystery: 1.3, life: 1.2, study: 1.2 },
   };
@@ -1817,10 +1936,10 @@ function buildLoveLifecycle() {
       const partner = makePartner(state.age >= 62);
       return () => {
         showEventModal({
-          icon: partner.senior ? '🌇' : '💘',
-          category: '家庭事件 · 邂逅',
-          title: partner.senior ? '黄昏里的相遇' : '怦然心动',
-          desc: `你参加${partner.scene}时，遇到了${partner.name}（${partner.tag.type}：${partner.tag.desc}）。聊了几句，感觉很不一样。`,
+          icon: partner.senior ? '🌇' : (partner.local ? partner.flag : '💘'),
+          category: partner.local ? '家庭事件 · 异国邂逅' : '家庭事件 · 邂逅',
+          title: partner.senior ? '黄昏里的相遇' : (partner.local ? '跨越山海的心动' : '怦然心动'),
+          desc: `你参加${partner.scene}时，遇到了${partner.local ? partner.flag + ' 当地人' : ''}${partner.name}（${partner.tag.type}：${partner.tag.desc}）。聊了几句，感觉很不一样。`,
           choices: [
             { text: 'A. 主动出击，认识一下', effects: { happy:+8 } },
             { text: 'B. 缘分随风，保持距离', effects: { smart:+3 } },
@@ -1938,8 +2057,11 @@ function marry() {
   state.married = true;
   state.dating = false;
   state.marriedYears = 0;
-  if (state.partner) state.spouseTag = state.partner.tag;
-  if (state.partner && state.partner.senior) state.seniorLove = true;
+  if (state.partner) {
+    state.spouseTag = state.partner.tag;
+    state.spouseLocal = state.partner.origin || state.partner.local || null;
+    if (state.partner.senior) state.seniorLove = true;
+  }
   state.widowed = false;
 }
 
@@ -1949,6 +2071,10 @@ function endYear() {
   state.turnCount++;
   if (state.dating) state.datingYears++;
   if (state.married) state.marriedYears++;
+  if (state.track === 'diplomat') {
+    if (state.abroad) state.abroadYears++;
+    else state.homeYears++;
+  }
   updateDisplay();
 
   // 自然死亡判定：76 岁起逐年上升
@@ -1964,6 +2090,23 @@ function endYear() {
     return;
   }
 
+  // 外交官轮岗：45 岁前国内三年 ↔ 国外三年
+  if (state.track === 'diplomat' && state.age < 45) {
+    if (!state.abroad && state.homeYears >= 3) {
+      setTimeout(triggerPosting, 400);
+      return;
+    }
+    if (state.abroad && state.abroadYears >= 3) {
+      setTimeout(triggerReturn, 400);
+      return;
+    }
+  }
+  // 45 岁后若仍在国外，安排回国常驻
+  if (state.track === 'diplomat' && state.age >= 45 && state.abroad) {
+    setTimeout(triggerReturn, 400);
+    return;
+  }
+
   // 人生岔路：每 4 年一次
   if (state.turnCount % 4 === 0) {
     setTimeout(triggerCrossroad, 400);
@@ -1971,6 +2114,74 @@ function endYear() {
     state.isSpinning = false;
     $('spinBtn').disabled = false;
   }
+}
+
+// ===== 外交官轮岗事件 =====
+function triggerPosting() {
+  const country = pickPostingCountry();
+  const hardshipNote = country.hardship ? '这是艰苦地区岗位，补贴高、提拔快，但条件艰苦。' : '';
+  showEventModal({
+    icon: country.flag,
+    category: '职业事件 · 外派任命',
+    title: `外派${country.name}！`,
+    desc: `一纸调令：你被派驻${country.name}。${country.desc}。${hardshipNote}任期三年。`,
+    effects: country.hardship
+      ? { career:+6, smart:+5, promo:+8, happy:-4, wealth:+5 }
+      : { career:+5, smart:+4, promo:+5, happy:+3 },
+    evClass: 'work',
+    onDone: (_, effects) => {
+      applyStat(effects);
+      state.abroad = country.name;
+      state.abroadYears = 0;
+      state.homeYears = 0;
+      state.postings.push(country.name);
+      state.history.push({ age: state.age, icon: country.flag, text: `外派${country.name}，任期三年` });
+      // 异地恋考验：驻外且恋爱中，50% 概率分手
+      if (state.dating && state.partner && !state.partner.local && Math.random() < 0.5) {
+        const p = state.partner;
+        state.history.push({ age: state.age, icon:'💔', text:`异国恋没能撑住，和${p.name}分手了`, cls:'family' });
+        state.partner = null; state.dating = false; state.datingYears = 0; state.breakups++;
+      }
+      renderHistory();
+      updateDisplay();
+      state.isSpinning = false;
+      $('spinBtn').disabled = false;
+    }
+  });
+}
+
+function triggerReturn() {
+  const from = state.abroad;
+  showEventModal({
+    icon: '🛬',
+    category: '职业事件 · 轮岗回国',
+    title: '结束任期，回国了',
+    desc: `驻${from}的任期结束，你回到部里工作。落地那一刻，最想吃的是一碗热腾腾的家乡味道。`,
+    effects: { happy:+6, promo:+4 },
+    evClass: 'work',
+    onDone: (_, effects) => {
+      applyStat(effects);
+      state.abroad = null;
+      state.abroadYears = 0;
+      state.homeYears = 0;
+      state.history.push({ age: state.age, icon:'🛬', text:`结束驻${from}任期，回国` });
+      // 跨国恋人面临抉择：50% 跟随回国，否则分手
+      if (state.dating && state.partner && state.partner.local === from) {
+        const p = state.partner;
+        if (Math.random() < 0.5) {
+          state.history.push({ age: state.age, icon:'✈️', text:`${p.name}决定跟你来中国生活`, cls:'family' });
+          state.partner.local = null; // 已随迁（origin 仍保留国籍）
+        } else {
+          state.history.push({ age: state.age, icon:'💔', text:`${p.name}不愿离开${from}，你们和平分手`, cls:'family' });
+          state.partner = null; state.dating = false; state.datingYears = 0; state.breakups++;
+        }
+      }
+      renderHistory();
+      updateDisplay();
+      state.isSpinning = false;
+      $('spinBtn').disabled = false;
+    }
+  });
 }
 
 function triggerCrossroad() {
@@ -2038,6 +2249,12 @@ function showEnding() {
   } else if (state.seniorLove && (state.married || state.widowed) && state.age >= 70) {
     // 隐藏结局：黄昏恋
     ending = { tag:'🌅 夕阳无限好', desc:'谁说爱情只属于年轻人？你在人生的黄昏遇到了对的人，最后的岁月被温柔填满。', hidden:true };
+  } else if (state.track === 'diplomat' && state.spouseLocal && state.married) {
+    // 隐藏结局：外交官跨国婚姻
+    ending = { tag:'🌍 山海不为远', desc:`外交生涯带你走过 ${state.postings.length} 个国家，也带来了跨越山海的爱情。你和来自${state.spouseLocal}的爱人，把两种人生过成了一种。`, hidden:true };
+  } else if (state.track === 'diplomat' && state.postings.includes('厄立特里亚') && state.level >= 5) {
+    // 隐藏结局：从厄立特里亚走出的大使
+    ending = { tag:'🇪🇷 从厄立特里亚出发', desc:'从红海之滨最艰苦的馆开始，一步步走到公使、大使。多年后你总说：最想念的还是阿斯马拉的咖啡。', hidden:true };
   } else if (state.spouseTag && state.spouseTag.type === '颜值' && state.marriedYears >= 30 && state.happy >= 70) {
     // 隐藏结局：神仙眷侣
     ending = { tag:'💫 神仙眷侣', desc:`和${state.spouseTag.desc}的爱人携手 ${state.marriedYears} 年，你们是朋友圈里永远的模范夫妻。`, hidden:true };
@@ -2063,6 +2280,7 @@ function showEnding() {
     corporate: ['执掌一方的 CEO', '叱咤商界'],
     academic:  ['桃李天下的院士', '学界泰斗'],
     civil:     ['国之栋梁', '为民请命一辈子'],
+    diplomat:  ['共和国大使', '外交战线的传奇'],
     startup:   ['敲钟上市的传奇', '商业帝国缔造者'],
     freelance: ['行业标杆', '自由而丰盛'],
   };
@@ -2100,7 +2318,11 @@ function buildLifeSummary(ending, stats, levelTitle) {
     } else if (state.gradPath === 'study') {
       gradText = `${edu}毕业后，你选择继续深造，走上了学术之路。`;
     } else if (state.gradPath === 'gaokao') {
-      gradText = `${edu}毕业后，你考公上岸，从${track ? track.levels[0] : '科员'}干起。`;
+      if (state.track === 'diplomat') {
+        gradText = `${edu}毕业后，你被外交部选中，从随员干起，开始了国内外轮岗的外交生涯。`;
+      } else {
+        gradText = `${edu}毕业后，你考公上岸，从${track ? track.levels[0] : '科员'}干起。`;
+      }
     } else if (state.gradPath === 'startup') {
       gradText = `${edu}毕业后，你没有选择打工，而是直接创业当了老板。`;
     } else if (state.gradPath === 'gapyear') {
@@ -2124,6 +2346,10 @@ function buildLifeSummary(ending, stats, levelTitle) {
   } else if (track) {
     careerText = `职级上你始终是${track.levels[0]}，但人生的价值从不只有升职这一个刻度。`;
   }
+  // 外交生涯足迹
+  if (state.postings && state.postings.length > 0) {
+    careerText += `外交生涯里你先后驻过${state.postings.join('、')}${state.postings.length > 1 ? ' ' + state.postings.length + ' 个国家' : ''}，护照上的每一个章都是故事。`;
+  }
 
   // 家庭线
   let familyText = '';
@@ -2134,6 +2360,7 @@ function buildLifeSummary(ending, stats, levelTitle) {
       familyText = `你曾拥有一段 ${state.marriedYears} 年的婚姻${tagStr ? '，爱人' + tagStr : ''}，虽然最后送走了对方，但那些相伴的岁月是你最珍贵的收藏。`;
     } else if (spouseName) {
       familyText = `你和${spouseName}${tagStr}携手走过 ${state.marriedYears} 年。`;
+      if (state.spouseLocal) familyText += `这段始于${state.spouseLocal}的跨国婚姻，让两种文化在一个屋檐下开花。`;
     } else {
       familyText = `你的婚姻走过了 ${state.marriedYears} 年。`;
     }
