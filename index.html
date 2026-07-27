@@ -1219,7 +1219,7 @@ const EVENTS = {
 const CROSSROADS = [
   {
     id:'cr_love', icon:'💘', title:'谈婚论嫁', minAge:24, maxAge:45,
-    require: s => s.dating && !s.married,
+    require: s => s.dating && !s.married && !(s.track === 'diplomat' && !s.retired && s.partner && (s.partner.origin || s.partner.local)),
     desc:'感情稳定了，双方父母也见过了。要不要结婚？',
     choices:[
       { text:'A. 求婚！办一场婚礼', effects:{ wealth:-20, happy:+20 }, setFlag:'married' },
@@ -1419,6 +1419,8 @@ const state = {
   homeYears: 0,         // 本次国内已满年数
   postings: [],         // 历史外派国家
   spouseLocal: null,    // 跨国伴侣的国籍
+  retired: false,       // 外交官已退休
+  exDiplomat: false,    // 为爱辞官标记
 };
 
 const START_BONUS = {
@@ -1658,7 +1660,7 @@ function updateLevelDisplay() {
     $('displayLevel').textContent = track.levels[state.level];
   }
   if (state.track === 'diplomat' && $('displayPath')) {
-    $('displayPath').textContent = state.abroad ? `外交官·驻${state.abroad}` : '外交官';
+    $('displayPath').textContent = state.exDiplomat ? '前外交官' : (state.retired ? '退休外交官' : (state.abroad ? `外交官·驻${state.abroad}` : '外交官'));
   }
 }
 
@@ -1973,6 +1975,45 @@ function buildLoveLifecycle() {
     const breakChance = 0.15;
     const roll = Math.random();
     if (state.datingYears >= 1 && roll < marryChance) {
+      // 外交纪律：在职外交官不得与外国人结婚
+      const isForeign = !!(p.origin || p.local);
+      if (state.track === 'diplomat' && !state.retired && isForeign) {
+        return () => {
+          showEventModal({
+            icon: '⚖️',
+            category: '家庭事件 · 纪律与爱情',
+            title: '爱情撞上了外交纪律',
+            desc: `你和${p.name}感情越来越深，可组织找你谈话了：外交人员不得与外国人结婚，这是铁的纪律。摆在你面前的只有两条路。`,
+            choices: [
+              { text: 'A. 为爱辞官，脱下这身职业', effects: { career:-25, happy:+15 } },
+              { text: 'B. 忠于职守，忍痛分手', effects: { happy:-15, career:+8, promo:+10 } },
+            ],
+            evClass: 'family',
+            onDone: (choiceText, effects) => {
+              applyStat(effects);
+              if (choiceText && choiceText.startsWith('A')) {
+                state.retired = true;       // 离开外交系统，不再轮岗
+                state.exDiplomat = true;
+                state.abroad = null;
+                state.promoRate = 0.3;      // 体制外，职级基本冻结
+                state.history.push({ age: state.age, icon:'⚖️', text:`为了${p.name}，你辞去了外交官职务` });
+                marry();
+                state.history.push({ age: state.age, icon:'💍', text:`和${p.name}结婚了！`, cls:'family' });
+                if ($('displayPath')) $('displayPath').textContent = '前外交官';
+              } else {
+                state.history.push({ age: state.age, icon:'💔', text:`纪律面前，你和${p.name}忍痛分开`, cls:'family' });
+                state.partner = null;
+                state.dating = false;
+                state.datingYears = 0;
+                state.breakups++;
+              }
+              renderHistory();
+              updateDisplay();
+              processYearQueue();
+            }
+          });
+        };
+      }
       return () => {
         showEventModal({
           icon: p.senior ? '🌅' : '💍',
@@ -2090,8 +2131,12 @@ function endYear() {
     return;
   }
 
-  // 外交官轮岗：45 岁前国内三年 ↔ 国外三年
-  if (state.track === 'diplomat' && state.age < 45) {
+  // 外交官轮岗：60 岁退休前，国内三年 ↔ 国外三年
+  if (state.track === 'diplomat' && !state.retired) {
+    if (state.age >= 60) {
+      setTimeout(triggerDiplomatRetire, 400);
+      return;
+    }
     if (!state.abroad && state.homeYears >= 3) {
       setTimeout(triggerPosting, 400);
       return;
@@ -2100,11 +2145,6 @@ function endYear() {
       setTimeout(triggerReturn, 400);
       return;
     }
-  }
-  // 45 岁后若仍在国外，安排回国常驻
-  if (state.track === 'diplomat' && state.age >= 45 && state.abroad) {
-    setTimeout(triggerReturn, 400);
-    return;
   }
 
   // 人生岔路：每 4 年一次
@@ -2142,6 +2182,32 @@ function triggerPosting() {
         state.history.push({ age: state.age, icon:'💔', text:`异国恋没能撑住，和${p.name}分手了`, cls:'family' });
         state.partner = null; state.dating = false; state.datingYears = 0; state.breakups++;
       }
+      renderHistory();
+      updateDisplay();
+      state.isSpinning = false;
+      $('spinBtn').disabled = false;
+    }
+  });
+}
+
+function triggerDiplomatRetire() {
+  const from = state.abroad;
+  const nPost = state.postings.length;
+  showEventModal({
+    icon: '🎖️',
+    category: '职业事件 · 光荣退休',
+    title: '外交生涯落幕',
+    desc: `60 岁，你${from ? `结束驻${from}的最后一个任期，` : ''}正式从外交战线退休。${nPost} 个国家、无数次起落，护照上的章比相册还厚。部里为你办了简朴而隆重的欢送会。`,
+    effects: { happy:+10, career:+5 },
+    evClass: 'work',
+    onDone: (_, effects) => {
+      applyStat(effects);
+      if (from) state.history.push({ age: state.age, icon:'🛬', text:`结束驻${from}任期，回国` });
+      state.abroad = null;
+      state.abroadYears = 0;
+      state.homeYears = 0;
+      state.retired = true;
+      state.history.push({ age: state.age, icon:'🎖️', text:`从外交部光荣退休，生涯驻外 ${nPost} 国` });
       renderHistory();
       updateDisplay();
       state.isSpinning = false;
@@ -2249,9 +2315,9 @@ function showEnding() {
   } else if (state.seniorLove && (state.married || state.widowed) && state.age >= 70) {
     // 隐藏结局：黄昏恋
     ending = { tag:'🌅 夕阳无限好', desc:'谁说爱情只属于年轻人？你在人生的黄昏遇到了对的人，最后的岁月被温柔填满。', hidden:true };
-  } else if (state.track === 'diplomat' && state.spouseLocal && state.married) {
-    // 隐藏结局：外交官跨国婚姻
-    ending = { tag:'🌍 山海不为远', desc:`外交生涯带你走过 ${state.postings.length} 个国家，也带来了跨越山海的爱情。你和来自${state.spouseLocal}的爱人，把两种人生过成了一种。`, hidden:true };
+  } else if (state.exDiplomat && state.spouseLocal && state.married) {
+    // 隐藏结局：为爱辞官
+    ending = { tag:'🌍 山海不为远', desc:`你曾是走过 ${state.postings.length} 个国家的外交官，最终为了来自${state.spouseLocal}的爱人脱下了这身职业。有人说可惜，你说值得。`, hidden:true };
   } else if (state.track === 'diplomat' && state.postings.includes('厄立特里亚') && state.level >= 5) {
     // 隐藏结局：从厄立特里亚走出的大使
     ending = { tag:'🇪🇷 从厄立特里亚出发', desc:'从红海之滨最艰苦的馆开始，一步步走到公使、大使。多年后你总说：最想念的还是阿斯马拉的咖啡。', hidden:true };
@@ -2349,6 +2415,7 @@ function buildLifeSummary(ending, stats, levelTitle) {
   // 外交生涯足迹
   if (state.postings && state.postings.length > 0) {
     careerText += `外交生涯里你先后驻过${state.postings.join('、')}${state.postings.length > 1 ? ' ' + state.postings.length + ' 个国家' : ''}，护照上的每一个章都是故事。`;
+    if (state.exDiplomat) careerText += '后来你为了爱情亲手结束了这段生涯，江湖再无你的电报，家里多了一盏为你亮的灯。';
   }
 
   // 家庭线
