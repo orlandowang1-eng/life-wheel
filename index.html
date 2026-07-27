@@ -1,0 +1,1582 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>人生转盘 · Life Wheel</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=ZCOOL+KuaiLe&display=swap');
+
+  /* 像素风渲染：整站禁用抗锯齿，强化方块颗粒感 */
+  * {
+    -webkit-font-smoothing: none;
+    -moz-osx-font-smoothing: none;
+    font-smooth: never;
+    text-rendering: geometricPrecision;
+  }
+
+  :root {
+    --bg-dark: #1a1c2c;
+    --bg-mid: #29366f;
+    --pixel-pink: #ff77a8;
+    --pixel-red: #ff004d;
+    --pixel-yellow: #ffec27;
+    --pixel-green: #00e436;
+    --pixel-blue: #29adff;
+    --pixel-purple: #7e2553;
+    --pixel-white: #fff1e8;
+    --pixel-gray: #5f574f;
+    --pixel-dark: #111;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'ZCOOL KuaiLe', 'Press Start 2P', 'Courier New', monospace;
+    background: var(--bg-dark);
+    color: var(--pixel-white);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.04) 2px, transparent 2px),
+      linear-gradient(90deg, rgba(255,255,255,0.04) 2px, transparent 2px);
+    background-size: 16px 16px;
+    image-rendering: pixelated;
+  }
+
+  /* 像素锯齿边框工具类：用 box-shadow 堆出台阶感 */
+  .pixel-border {
+    border: none;
+    box-shadow:
+      0 -4px 0 0 var(--pixel-white),
+      0 4px 0 0 var(--pixel-white),
+      -4px 0 0 0 var(--pixel-white),
+      4px 0 0 0 var(--pixel-white),
+      0 -8px 0 0 var(--pixel-dark),
+      0 8px 0 0 var(--pixel-dark),
+      -8px 0 0 0 var(--pixel-dark),
+      8px 0 0 0 var(--pixel-dark);
+  }
+
+  .container {
+    max-width: 900px;
+    width: 100%;
+    background: var(--bg-mid);
+    padding: 30px;
+    position: relative;
+    /* 像素台阶边框 */
+    box-shadow:
+      0 0 0 4px var(--pixel-white),
+      0 0 0 8px var(--pixel-dark),
+      0 0 0 12px var(--pixel-white),
+      12px 12px 0 12px rgba(0,0,0,0.5);
+  }
+
+  .container::before {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    border: 2px dashed rgba(255,255,255,0.2);
+    pointer-events: none;
+  }
+
+  h1 {
+    font-family: 'Press Start 2P', monospace;
+    text-align: center;
+    color: var(--pixel-yellow);
+    font-size: 24px;
+    margin-bottom: 8px;
+    text-shadow: 3px 3px 0 var(--pixel-red);
+    letter-spacing: 2px;
+  }
+
+  .subtitle {
+    text-align: center;
+    color: var(--pixel-pink);
+    font-size: 14px;
+    margin-bottom: 30px;
+    font-family: 'Press Start 2P', monospace;
+  }
+
+  /* ---- Setup Screen ---- */
+  .setup { display: block; }
+  .setup.hidden { display: none; }
+
+  .form-group {
+    margin-bottom: 20px;
+  }
+
+  label {
+    display: block;
+    font-size: 18px;
+    margin-bottom: 8px;
+    color: var(--pixel-yellow);
+  }
+
+  input, select {
+    width: 100%;
+    padding: 12px;
+    font-family: 'ZCOOL KuaiLe', 'Courier New', monospace;
+    font-size: 18px;
+    background: var(--bg-dark);
+    color: var(--pixel-white);
+    border: none;
+    outline: none;
+    box-shadow:
+      inset 0 0 0 2px var(--pixel-dark),
+      0 0 0 3px var(--pixel-white);
+  }
+
+  input:focus, select:focus {
+    box-shadow:
+      inset 0 0 0 2px var(--pixel-dark),
+      0 0 0 3px var(--pixel-yellow),
+      0 0 0 6px var(--pixel-red);
+  }
+
+  .flag-group {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .flag-option {
+    padding: 12px;
+    text-align: center;
+    background: var(--bg-dark);
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    user-select: none;
+    transition: none;
+    box-shadow:
+      inset 0 0 0 2px var(--pixel-dark),
+      0 0 0 3px var(--pixel-white);
+  }
+
+  .flag-option:hover {
+    background: var(--pixel-purple);
+    transform: translate(-2px, -2px);
+    box-shadow: 4px 4px 0 var(--pixel-dark);
+  }
+
+  .flag-option.selected {
+    background: var(--pixel-red);
+    color: var(--pixel-yellow);
+    box-shadow:
+      inset 0 0 0 2px var(--pixel-dark),
+      0 0 0 3px var(--pixel-yellow),
+      0 0 0 6px var(--pixel-red);
+  }
+
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 16px;
+    font-family: 'Press Start 2P', 'ZCOOL KuaiLe', monospace;
+    font-size: 16px;
+    background: var(--pixel-red);
+    color: var(--pixel-white);
+    border: none;
+    cursor: pointer;
+    letter-spacing: 2px;
+    margin-top: 20px;
+    transition: none;
+    box-shadow:
+      inset 0 -4px 0 0 rgba(0,0,0,0.4),
+      0 0 0 4px var(--pixel-dark),
+      0 0 0 8px var(--pixel-white),
+      6px 6px 0 8px var(--pixel-dark);
+  }
+
+  .btn:hover {
+    background: var(--pixel-pink);
+    transform: translate(-2px, -2px);
+    box-shadow:
+      inset 0 -4px 0 0 rgba(0,0,0,0.4),
+      0 0 0 4px var(--pixel-dark),
+      0 0 0 8px var(--pixel-white),
+      8px 8px 0 8px var(--pixel-dark);
+  }
+
+  .btn:active {
+    transform: translate(2px, 2px);
+    box-shadow:
+      inset 0 -4px 0 0 rgba(0,0,0,0.4),
+      0 0 0 4px var(--pixel-dark),
+      0 0 0 8px var(--pixel-white),
+      2px 2px 0 8px var(--pixel-dark);
+  }
+
+  .btn:disabled {
+    background: var(--pixel-gray);
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  /* ---- Game Screen ---- */
+  .game { display: none; }
+  .game.active { display: block; }
+
+  .status-bar {
+    display: grid;
+    grid-template-columns: 1fr 1.5fr 1fr;
+    gap: 15px;
+    margin-bottom: 20px;
+    padding: 15px 20px;
+    background: var(--bg-dark);
+    box-shadow:
+      inset 0 0 0 2px var(--pixel-dark),
+      0 0 0 3px var(--pixel-white);
+  }
+
+  .status-item {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 12px;
+    font-size: 16px;
+  }
+
+  .status-label { color: var(--pixel-yellow); }
+  .status-value { color: var(--pixel-white); font-weight: bold; }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .stat-box {
+    background: var(--bg-dark);
+    padding: 12px 8px;
+    text-align: center;
+    box-shadow:
+      inset 0 0 0 2px var(--pixel-dark),
+      0 0 0 3px var(--pixel-white);
+  }
+
+  .stat-icon { font-size: 24px; }
+  .stat-name { font-size: 12px; color: var(--pixel-yellow); margin: 4px 0; }
+  .stat-value { font-size: 22px; font-weight: bold; }
+  .stat-bar {
+    height: 6px;
+    background: var(--pixel-gray);
+    margin-top: 6px;
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-fill {
+    height: 100%;
+    background: var(--pixel-green);
+    transition: width 0.5s;
+  }
+
+  /* ---- Wheel ---- */
+  .wheel-container {
+    position: relative;
+    width: 320px;
+    height: 320px;
+    margin: 20px auto;
+  }
+
+  .wheel-pointer {
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 32px;
+    z-index: 10;
+    filter: drop-shadow(0 2px 0 var(--pixel-dark));
+  }
+
+  .wheel {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    position: relative;
+    transition: transform 4s cubic-bezier(0.17, 0.67, 0.32, 1.28);
+    border: 6px solid var(--pixel-white);
+    box-shadow: 0 0 0 4px var(--pixel-dark), 0 8px 0 4px var(--pixel-purple);
+  }
+
+  .wheel-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 60px;
+    height: 60px;
+    background: var(--pixel-yellow);
+    border-radius: 50%;
+    border: 4px solid var(--pixel-dark);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    z-index: 5;
+  }
+
+  .spin-btn {
+    display: block;
+    margin: 20px auto 0;
+    padding: 14px 40px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 14px;
+    background: var(--pixel-green);
+    color: var(--pixel-dark);
+    border: 4px solid var(--pixel-dark);
+    cursor: pointer;
+    letter-spacing: 2px;
+    box-shadow: 4px 4px 0 var(--pixel-dark);
+    transition: all 0.1s;
+  }
+
+  .spin-btn:hover:not(:disabled) {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 var(--pixel-dark);
+  }
+
+  .spin-btn:disabled {
+    background: var(--pixel-gray);
+    cursor: not-allowed;
+  }
+
+  /* ---- Graduate Screen ---- */
+  .graduate { display: none; }
+  .graduate.active { display: block; }
+
+  .grad-header { text-align: center; margin-bottom: 24px; }
+  .grad-title {
+    font-family: 'Press Start 2P', 'ZCOOL KuaiLe', monospace;
+    font-size: 20px;
+    color: var(--pixel-yellow);
+    margin-bottom: 8px;
+    text-shadow: 2px 2px 0 var(--pixel-red);
+  }
+  .grad-age { color: var(--pixel-pink); font-size: 15px; }
+
+  .grad-options {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+  .grad-card {
+    background: var(--bg-dark);
+    padding: 20px 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: none;
+    box-shadow:
+      inset 0 0 0 2px var(--pixel-dark),
+      0 0 0 3px var(--pixel-white);
+  }
+  .grad-card:hover {
+    background: var(--pixel-purple);
+    transform: translate(-2px, -2px);
+    box-shadow:
+      inset 0 0 0 2px var(--pixel-dark),
+      0 0 0 3px var(--pixel-yellow),
+      6px 6px 0 3px var(--pixel-dark);
+  }
+  .grad-icon { font-size: 36px; margin-bottom: 8px; }
+  .grad-label {
+    font-size: 18px;
+    color: var(--pixel-yellow);
+    font-weight: bold;
+    margin-bottom: 6px;
+  }
+  .grad-desc { font-size: 13px; color: var(--pixel-white); line-height: 1.4; opacity: 0.8; }
+
+  /* 岔路事件卡片：加个金边强调"这是重要选择" */
+  .event-card.crossroad {
+    background: linear-gradient(135deg, var(--bg-mid), var(--pixel-purple));
+    box-shadow: 8px 8px 0 var(--pixel-dark), 0 0 0 4px var(--pixel-yellow);
+  }
+  .event-card.crossroad .event-title {
+    color: var(--pixel-yellow);
+    text-shadow: 2px 2px 0 var(--pixel-red);
+  }
+
+  /* ---- Event Modal ---- */
+  .event-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.8);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    animation: fadeIn 0.3s;
+  }
+
+  .event-modal.active { display: flex; }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .event-card {
+    max-width: 500px;
+    width: 100%;
+    background: var(--bg-mid);
+    border: 4px solid var(--pixel-white);
+    box-shadow: 8px 8px 0 var(--pixel-dark);
+    padding: 30px;
+    animation: slideUp 0.4s ease-out;
+  }
+
+  @keyframes slideUp {
+    from { transform: translateY(30px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  .event-icon {
+    font-size: 48px;
+    text-align: center;
+    margin-bottom: 12px;
+  }
+
+  .event-category {
+    text-align: center;
+    color: var(--pixel-yellow);
+    font-size: 14px;
+    margin-bottom: 8px;
+    font-family: 'Press Start 2P', monospace;
+  }
+
+  .event-title {
+    text-align: center;
+    font-size: 22px;
+    color: var(--pixel-white);
+    margin-bottom: 16px;
+    line-height: 1.4;
+  }
+
+  .event-desc {
+    background: var(--bg-dark);
+    border: 2px solid var(--pixel-gray);
+    padding: 14px;
+    font-size: 16px;
+    line-height: 1.6;
+    margin-bottom: 16px;
+    color: var(--pixel-white);
+  }
+
+  .event-effects {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+
+  .effect-tag {
+    padding: 6px 12px;
+    background: var(--bg-dark);
+    border: 2px solid var(--pixel-white);
+    font-size: 14px;
+  }
+
+  .effect-tag.positive { color: var(--pixel-green); border-color: var(--pixel-green); }
+  .effect-tag.negative { color: var(--pixel-red); border-color: var(--pixel-red); }
+
+  .choice-buttons {
+    display: flex;
+    gap: 10px;
+    flex-direction: column;
+  }
+
+  #eventChoices {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .choice-btn {
+    padding: 12px;
+    font-family: 'ZCOOL KuaiLe', monospace;
+    font-size: 16px;
+    background: var(--bg-dark);
+    color: var(--pixel-white);
+    border: 3px solid var(--pixel-white);
+    cursor: pointer;
+    text-align: left;
+    line-height: 1.4;
+    transition: all 0.1s;
+  }
+
+  .choice-btn:hover {
+    background: var(--pixel-purple);
+    transform: translate(-2px, -2px);
+    box-shadow: 4px 4px 0 var(--pixel-dark);
+  }
+
+  .close-event-btn {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 14px;
+    background: var(--pixel-green);
+    color: var(--pixel-dark);
+    border: 3px solid var(--pixel-dark);
+    cursor: pointer;
+    letter-spacing: 2px;
+  }
+
+  /* ---- History ---- */
+  .history {
+    margin-top: 20px;
+    padding: 15px;
+    background: var(--bg-dark);
+    max-height: 200px;
+    overflow-y: auto;
+    box-shadow:
+      inset 0 0 0 2px var(--pixel-dark),
+      0 0 0 3px var(--pixel-white);
+  }
+
+  .history-title {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 12px;
+    color: var(--pixel-yellow);
+    margin-bottom: 10px;
+  }
+
+  .history-item {
+    padding: 8px;
+    border-bottom: 1px dashed var(--pixel-gray);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .history-item:last-child { border-bottom: none; }
+  .history-age { color: var(--pixel-yellow); font-weight: bold; }
+
+  /* ---- Ending Screen ---- */
+  .ending { display: none; }
+  .ending.active { display: block; }
+
+  .ending-card {
+    background: linear-gradient(135deg, var(--pixel-purple), var(--bg-mid));
+    border: 4px solid var(--pixel-yellow);
+    padding: 30px;
+    text-align: center;
+    box-shadow: 8px 8px 0 var(--pixel-dark);
+  }
+
+  .ending-title {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 20px;
+    color: var(--pixel-yellow);
+    margin-bottom: 12px;
+    text-shadow: 2px 2px 0 var(--pixel-red);
+  }
+
+  .ending-tag {
+    font-size: 32px;
+    color: var(--pixel-pink);
+    margin: 20px 0;
+    font-weight: bold;
+  }
+
+  .ending-desc {
+    font-size: 16px;
+    line-height: 1.6;
+    margin-bottom: 20px;
+    color: var(--pixel-white);
+  }
+
+  /* 人生总结文本卡片 */
+  .life-summary {
+    background: var(--bg-dark);
+    padding: 20px 22px;
+    margin: 20px 0;
+    text-align: left;
+    box-shadow:
+      inset 0 0 0 2px var(--pixel-dark),
+      0 0 0 3px var(--pixel-white);
+    max-height: 320px;
+    overflow-y: auto;
+  }
+  .life-summary-title {
+    font-family: 'Press Start 2P', 'ZCOOL KuaiLe', monospace;
+    font-size: 14px;
+    color: var(--pixel-yellow);
+    margin-bottom: 12px;
+    text-shadow: 1px 1px 0 var(--pixel-red);
+  }
+  .life-summary-text {
+    font-size: 15px;
+    line-height: 1.8;
+    color: var(--pixel-white);
+    white-space: pre-wrap;
+  }
+  .summary-actions {
+    display: flex;
+    gap: 10px;
+    margin: 15px 0 20px;
+  }
+  .summary-actions .btn {
+    flex: 1;
+    margin: 0;
+    padding: 12px;
+    font-size: 14px;
+  }
+  .btn-secondary {
+    background: var(--pixel-purple) !important;
+  }
+
+  .final-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin: 20px 0;
+  }
+
+  .final-stat {
+    background: var(--bg-dark);
+    padding: 12px;
+    border: 2px solid var(--pixel-white);
+    font-size: 16px;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: var(--bg-dark); }
+  ::-webkit-scrollbar-thumb { background: var(--pixel-gray); border: 1px solid var(--pixel-white); }
+
+  @media (max-width: 600px) {
+    h1 { font-size: 18px; }
+    .subtitle { font-size: 10px; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .wheel-container { width: 260px; height: 260px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>人生转盘</h1>
+  <p class="subtitle">- LIFE WHEEL SIMULATOR -</p>
+
+  <!-- ===== SETUP SCREEN ===== -->
+  <div class="setup" id="setup">
+    <div class="form-group">
+      <label>🎮 玩家名字</label>
+      <input type="text" id="playerName" placeholder="输入你的名字 / 花名" maxlength="12">
+    </div>
+
+    <div class="form-group">
+      <label>🎓 学历</label>
+      <select id="playerEdu">
+        <option value="college">大专</option>
+        <option value="bachelor" selected>本科</option>
+        <option value="master">硕士（+3岁 +智力）</option>
+        <option value="phd">博士（+6岁 +智力）</option>
+      </select>
+    </div>
+
+    <button class="btn" id="goGradBtn">🎓 毕业啦，选择方向 →</button>
+  </div>
+
+  <!-- ===== GRADUATE SCREEN ===== -->
+  <div class="graduate" id="graduate">
+    <div class="grad-header">
+      <div class="grad-title" id="gradTitle">-</div>
+      <div class="grad-age" id="gradAge">-</div>
+    </div>
+    <div class="grad-options" id="gradOptions"></div>
+  </div>
+
+  <button style="display:none" id="startBtn"></button>
+
+  <!-- ===== GAME SCREEN ===== -->
+  <div class="game" id="game">
+    <div class="status-bar">
+      <div class="status-item">
+        <span class="status-label">姓名</span>
+        <span class="status-value" id="displayName">-</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">路径</span>
+        <span class="status-value" id="displayPath">-</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">年龄</span>
+        <span class="status-value" id="displayAge">-</span>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-box">
+        <div class="stat-icon">💼</div>
+        <div class="stat-name">事业</div>
+        <div class="stat-value" id="statCareer">50</div>
+        <div class="stat-bar"><div class="stat-fill" id="fillCareer" style="width:50%"></div></div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-icon">💰</div>
+        <div class="stat-name">财富</div>
+        <div class="stat-value" id="statWealth">50</div>
+        <div class="stat-bar"><div class="stat-fill" id="fillWealth" style="width:50%"></div></div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-icon">❤️</div>
+        <div class="stat-name">幸福</div>
+        <div class="stat-value" id="statHappy">50</div>
+        <div class="stat-bar"><div class="stat-fill" id="fillHappy" style="width:50%"></div></div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-icon">🧠</div>
+        <div class="stat-name">智力</div>
+        <div class="stat-value" id="statSmart">50</div>
+        <div class="stat-bar"><div class="stat-fill" id="fillSmart" style="width:50%"></div></div>
+      </div>
+    </div>
+
+    <div class="wheel-container">
+      <div class="wheel-pointer">▼</div>
+      <canvas id="wheelCanvas" class="wheel" width="320" height="320"></canvas>
+      <div class="wheel-center">🎲</div>
+    </div>
+
+    <button class="spin-btn" id="spinBtn">转 动 命 运</button>
+
+    <div class="history">
+      <div class="history-title">📜 人生轨迹</div>
+      <div id="historyList"></div>
+    </div>
+  </div>
+
+  <!-- ===== ENDING SCREEN ===== -->
+  <div class="ending" id="ending">
+    <div class="ending-card">
+      <div class="ending-title">✨ 60 岁 · 人生总结 ✨</div>
+      <div class="ending-tag" id="endingTag">-</div>
+      <div class="ending-desc" id="endingDesc">-</div>
+      <div class="final-stats">
+        <div class="final-stat">💼 事业 <span id="finalCareer">-</span></div>
+        <div class="final-stat">💰 财富 <span id="finalWealth">-</span></div>
+        <div class="final-stat">❤️ 幸福 <span id="finalHappy">-</span></div>
+        <div class="final-stat">🧠 智力 <span id="finalSmart">-</span></div>
+      </div>
+
+      <div class="life-summary">
+        <div class="life-summary-title">📜 你的人生故事</div>
+        <div class="life-summary-text" id="lifeSummary">-</div>
+      </div>
+
+      <div class="summary-actions">
+        <button class="btn btn-secondary" onclick="copySummary()">📋 复制总结</button>
+        <button class="btn btn-secondary" onclick="shareSummary()">🎁 分享战绩</button>
+      </div>
+
+      <button class="btn" onclick="location.reload()">🔄 再来一次人生</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== EVENT MODAL ===== -->
+<div class="event-modal" id="eventModal">
+  <div class="event-card">
+    <div class="event-icon" id="eventIcon">🎯</div>
+    <div class="event-category" id="eventCategory">CATEGORY</div>
+    <div class="event-title" id="eventTitle">事件标题</div>
+    <div class="event-desc" id="eventDesc">事件描述</div>
+    <div class="event-effects" id="eventEffects"></div>
+    <div id="eventChoices"></div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// 人生转盘 v2
+// - 起始：毕业选择（就业/升学/考公/gap year），就业展开公司类型
+// - 玩法：转盘随机事件 + 每 3 轮一个人生岔路节点
+// - 4 维属性：事业/财富/幸福/智力
+// ============================================================
+
+// ===== 毕业选择 =====
+const GRADUATE_PATHS = {
+  employ: {
+    label: '就业',
+    icon: '💼',
+    desc: '直接进入职场，开始搬砖生涯',
+    hasSubChoice: true,
+    subLabel: '选个公司类型',
+    subs: [
+      { id:'bigtech', label:'大厂', icon:'🏢', desc:'福利好但内卷严重', effects:{ career:+8, wealth:+15, happy:-5, smart:+5 } },
+      { id:'midtech', label:'中厂', icon:'🏬', desc:'节奏适中，成长稳定', effects:{ career:+5, wealth:+8, happy:+5, smart:+3 } },
+      { id:'foreign', label:'外企', icon:'🌐', desc:'work-life balance 之神', effects:{ career:+3, wealth:+10, happy:+15, smart:+5 } },
+      { id:'stateown', label:'国企', icon:'🏛️', desc:'稳定养老，父母的最爱', effects:{ career:+2, wealth:+5, happy:+12, smart:0 } },
+      { id:'startup', label:'创业公司', icon:'🚀', desc:'一夜暴富或一夜归零', effects:{ career:+12, wealth:-5, happy:-3, smart:+10 } },
+      { id:'freelance', label:'自由职业', icon:'🎨', desc:'为爱发电，快乐至上', effects:{ career:-5, wealth:-3, happy:+20, smart:+8 } },
+    ]
+  },
+  study: {
+    label: '升学',
+    icon: '🎓',
+    desc: '继续深造，考研/读博或出国',
+    effects: { career:-5, wealth:-15, happy:+5, smart:+25 },
+    ageBonus: 3, // 出来时年龄+3
+  },
+  gaokao: {
+    label: '考公',
+    icon: '🏛️',
+    desc: '铁饭碗，一家人整整齐齐',
+    effects: { career:+3, wealth:+5, happy:+18, smart:+5 },
+  },
+  gapyear: {
+    label: 'Gap Year',
+    icon: '🌍',
+    desc: '不着急工作，先出去看看世界',
+    effects: { career:-10, wealth:-15, happy:+25, smart:+15 },
+  },
+};
+
+// ===== 事件池 =====
+// 分为 8 类，每 event 可含 choices（二选一）
+const EVENTS = {
+  career: [
+    { icon:'📈', title:'季度绩效 A+', desc:'你的绩效被评为 A+，主管在全组会上点名表扬。', effects:{ career:+10, wealth:+5, happy:+5 } },
+    { icon:'📉', title:'项目失败', desc:'负责的项目 KPI 没达成，被主管当面复盘。', effects:{ career:-10, happy:-8, smart:+3 } },
+    { icon:'🎯', title:'完成一个大项目', desc:'历时半年的项目上线，数据很好看。', effects:{ career:+12, wealth:+8, smart:+5 } },
+    { icon:'🏆', title:'年度优秀员工', desc:'年会上你被点名表彰，还有一笔奖金。', effects:{ career:+15, wealth:+15, happy:+10 } },
+    { icon:'😤', title:'和主管吵架了', desc:'方案理念冲突，你和主管当场 argue 起来。', effects:{ career:-8, happy:-5, smart:+3 } },
+    { icon:'💤', title:'工作躺平期', desc:'找到了摸鱼的节奏，日子过得很松弛。', effects:{ career:-5, happy:+10, smart:-3 } },
+    { icon:'🔥', title:'部门大重组', desc:'部门大调整，你被划到新业务线，什么都要从头学。', effects:{ career:-3, happy:-5, smart:+8 } },
+    { icon:'📝', title:'向上管理成功', desc:'你成功让老板认可了你的方案。', effects:{ career:+10, happy:+8, smart:+5 } },
+    { icon:'😩', title:'背了一口锅', desc:'同事捅的娄子最后算到你头上。', effects:{ career:-8, happy:-10, smart:+5 } },
+    { icon:'🤝', title:'带教新人', desc:'公司安排你带一个新同事。', effects:{ career:+5, happy:+5, smart:+8 } },
+    { icon:'☕', title:'茶水间八卦', desc:'茶水间听到了组织架构调整的小道消息。', effects:{ career:+3, happy:+3, smart:+5 } },
+    { icon:'🎤', title:'第一次做公开分享', desc:'部门大会上做了一次专题分享，紧张但很有成就感。', effects:{ career:+8, happy:+8, smart:+10 } },
+  ],
+  wealth: [
+    { icon:'📊', title:'股票赚了一笔', desc:'你在低点买入的股票涨了 30%。',
+      choices:[
+        { text:'A. 落袋为安卖掉', effects:{ wealth:+15, happy:+5 } },
+        { text:'B. 加仓继续持有', effects:{ wealth:+30, happy:-5, smart:-3 } }
+      ]},
+    { icon:'💸', title:'股票被套', desc:'重仓的票跌了 40%。', effects:{ wealth:-20, happy:-10, smart:+5 } },
+    { icon:'🎰', title:'中奖啦', desc:'刮刮乐中了一等奖！', effects:{ wealth:+30, happy:+15 } },
+    { icon:'😱', title:'踩雷 P2P', desc:'投的 P2P 平台跑路了。', effects:{ wealth:-25, happy:-15, smart:+8 } },
+    { icon:'💰', title:'工资涨了', desc:'年度调薪普涨 15%。', effects:{ wealth:+12, happy:+8 } },
+    { icon:'📈', title:'基金定投回报', desc:'坚持定投三年，收益率 25%。', effects:{ wealth:+15, smart:+5, happy:+8 } },
+    { icon:'🍜', title:'副业开张', desc:'业余接单/写公众号有了第一笔收入。', effects:{ wealth:+10, career:+5, happy:+10 } },
+    { icon:'🏦', title:'装修贷下来了', desc:'装修花光了积蓄，压力有点大。', effects:{ wealth:-15, happy:-5 } },
+    { icon:'💳', title:'刷爆信用卡', desc:'冲动消费，账单让你崩溃。', effects:{ wealth:-12, happy:-8, smart:+3 } },
+    { icon:'🏠', title:'房租又涨了', desc:'房东通知涨 500 一个月。', effects:{ wealth:-8, happy:-8 } },
+    { icon:'💵', title:'年终奖到账', desc:'年终奖 6 个月，爽！', effects:{ wealth:+20, happy:+15 } },
+    { icon:'🚨', title:'花呗还不上了', desc:'月光族的日常，只能借下个月的钱还这个月。', effects:{ wealth:-10, happy:-10, smart:+3 } },
+  ],
+  love: [
+    { icon:'💕', title:'脱单了', desc:'认识了一个不错的对象。', effects:{ happy:+15, smart:-3 } },
+    { icon:'💔', title:'分手', desc:'和对象和平分手。', effects:{ happy:-15, smart:+5 } },
+    { icon:'💌', title:'暧昧对象上线', desc:'公司来了个新同事，感觉很聊得来。', effects:{ happy:+8, career:-2 } },
+    { icon:'😭', title:'相亲失败', desc:'长辈安排的相亲，尴尬收场。', effects:{ happy:-5, smart:+3 } },
+    { icon:'👨‍👩‍👧', title:'家庭日常', desc:'和家人一起过了个温馨的假期。', effects:{ happy:+12, wealth:-3 } },
+    { icon:'💐', title:'纪念日惊喜', desc:'另一半给你准备了一个大惊喜。', effects:{ happy:+15, wealth:-3 } },
+    { icon:'😖', title:'异地恋煎熬', desc:'和对象天南海北，每次视频都很累。', effects:{ happy:-10, smart:+3 } },
+    { icon:'🥺', title:'被朋友当树洞', desc:'朋友失恋，你陪聊了一整晚。', effects:{ happy:+3, smart:+5 } },
+  ],
+  life: [
+    { icon:'🐱', title:'养宠物了', desc:'领养了一只猫/狗。', effects:{ happy:+15, wealth:-5 } },
+    { icon:'🏃', title:'开始健身', desc:'办了健身卡开始规律运动。', effects:{ happy:+10, smart:+5, wealth:-3 } },
+    { icon:'😷', title:'生病住院', desc:'一场大病，住了半个月院。', effects:{ happy:-15, wealth:-15, smart:+5 } },
+    { icon:'🎨', title:'培养了新爱好', desc:'开始学画画/摄影/乐器。', effects:{ happy:+12, smart:+8, wealth:-5 } },
+    { icon:'🏠', title:'搬家了', desc:'换了个更喜欢的房子/城市。', effects:{ happy:+10, wealth:-8 } },
+    { icon:'🍺', title:'和朋友聚会', desc:'一群老朋友周末聚了聚。', effects:{ happy:+8, wealth:-3 } },
+    { icon:'🥱', title:'长期熬夜', desc:'连续加班熬夜，身体亮红灯。', effects:{ happy:-8, smart:-5, career:+3 } },
+    { icon:'🚇', title:'通勤 2 小时', desc:'新房子太远，每天路上就 4 小时。', effects:{ happy:-12, smart:+3 } },
+    { icon:'🎢', title:'和朋友周末出游', desc:'去了郊外，感觉整个人被治愈。', effects:{ happy:+15, wealth:-8 } },
+    { icon:'🍔', title:'点外卖点到腻', desc:'连续两周点外卖，胖了 5 斤。', effects:{ happy:-3, wealth:-5 } },
+    { icon:'🌿', title:'养绿植回血', desc:'工位放了几盆绿植，心情好多了。', effects:{ happy:+5, smart:+3 } },
+  ],
+  study: [
+    { icon:'📚', title:'考证成功', desc:'花了半年考的证终于拿到了。', effects:{ smart:+15, career:+8, happy:+5 } },
+    { icon:'🧠', title:'看了一本好书', desc:'一本改变认知的书。', effects:{ smart:+8, happy:+5 } },
+    { icon:'💻', title:'学了新技能', desc:'掌握了新工具/新语言/新方法。', effects:{ smart:+10, career:+8 } },
+    { icon:'🎤', title:'参加行业大会', desc:'去了一场行业峰会，认识了不少同行。', effects:{ smart:+8, career:+10, wealth:-3 } },
+    { icon:'📖', title:'夜校打卡', desc:'报了个夜校，学得很起劲。', effects:{ smart:+12, wealth:-5, happy:+3 } },
+    { icon:'❌', title:'考证挂了', desc:'考了三次，还是没过。', effects:{ smart:+5, happy:-8, wealth:-3 } },
+  ],
+  social: [
+    { icon:'🤝', title:'认识了贵人', desc:'一个前辈愿意带你成长。', effects:{ career:+15, smart:+8, happy:+8 } },
+    { icon:'🎭', title:'被朋友借钱', desc:'多年的朋友张口借 5 万。',
+      choices:[
+        { text:'A. 借了', effects:{ wealth:-10, happy:+3 } },
+        { text:'B. 委婉拒绝', effects:{ wealth:0, happy:-5, smart:+5 } }
+      ]},
+    { icon:'👥', title:'加入了新社群', desc:'找到了志同道合的小圈子。', effects:{ happy:+10, smart:+5 } },
+    { icon:'😠', title:'和老友闹掰了', desc:'和多年好友因为一件小事翻脸。', effects:{ happy:-12, smart:+5 } },
+    { icon:'🎉', title:'当伴郎/伴娘', desc:'参加了朋友的婚礼，还上台了。', effects:{ happy:+10, wealth:-5 } },
+    { icon:'🎁', title:'意外收到礼物', desc:'朋友从外地给你寄了礼物。', effects:{ happy:+8 } },
+    { icon:'🍻', title:'组内团建', desc:'组内一起 K 歌，被逼唱了 3 首。', effects:{ happy:+5, career:+3, wealth:-3 } },
+  ],
+  mystery: [
+    { icon:'👽', title:'路遇算命先生', desc:'一位老人告诉你会有大运，你信吗？',
+      choices:[
+        { text:'A. 信，按他说的去做', effects:{ happy:+8, wealth:+15, smart:-5 } },
+        { text:'B. 不信，一笑而过', effects:{ smart:+8, happy:-2 } }
+      ]},
+    { icon:'🎁', title:'意外之财', desc:'一个多年不联系的亲戚给了你一笔钱。', effects:{ wealth:+20, happy:+8 } },
+    { icon:'🚨', title:'意外事故', desc:'被电动车撞了，还好没大事。', effects:{ wealth:+8, happy:-8, smart:+3 } },
+    { icon:'🎬', title:'上了热搜', desc:'一件小事让你意外走红网络。',
+      choices:[
+        { text:'A. 借势做自媒体', effects:{ wealth:+20, career:+10, happy:-5 } },
+        { text:'B. 低调删博，回归生活', effects:{ happy:+10, smart:+5 } }
+      ]},
+    { icon:'🧙', title:'神秘任务', desc:'一封匿名邮件邀请你做一件"很重要"的事。',
+      choices:[
+        { text:'A. 接受挑战', effects:{ smart:+15, happy:+10, wealth:+10 } },
+        { text:'B. 直接拉黑', effects:{ smart:+5 } }
+      ]},
+    { icon:'🐉', title:'家里长辈托梦', desc:'梦到已故长辈，醒来若有所思。', effects:{ smart:+10, happy:+5 } },
+    { icon:'🍀', title:'捡到 100 块', desc:'路上捡到 100 块，运气爆棚。', effects:{ wealth:+3, happy:+5 } },
+  ],
+};
+
+// ===== 人生岔路（每 3 轮触发一次）=====
+// 玩家必须主动做选择的重大节点
+const CROSSROADS = [
+  {
+    id:'crossroad_job1',
+    icon:'🔀',
+    title:'职业岔路口',
+    desc:'工作 3 年了，行业也在变。要不要动一动？',
+    choices:[
+      { text:'A. 跳槽到心仪的新公司（薪资 +50%，但要重新适应）', effects:{ career:+8, wealth:+20, happy:-10, smart:+5 } },
+      { text:'B. 内部转岗，换个方向试试', effects:{ career:+5, wealth:+3, happy:+5, smart:+10 } },
+      { text:'C. 原地不动，深耕专业', effects:{ career:+10, wealth:+5, happy:+8, smart:+8 } },
+    ]
+  },
+  {
+    id:'crossroad_study',
+    icon:'🎓',
+    title:'要不要读研/进修',
+    desc:'一个进修的机会摆在面前，纠结中……',
+    choices:[
+      { text:'A. 辞职读全日制研究生', effects:{ career:-5, wealth:-25, smart:+30, happy:-3 } },
+      { text:'B. 报个在职 MBA', effects:{ career:+5, wealth:-15, smart:+18, happy:-5 } },
+      { text:'C. 不进修，继续工作', effects:{ career:+3, wealth:+3, happy:+5 } },
+    ]
+  },
+  {
+    id:'crossroad_marry',
+    icon:'💍',
+    title:'感情大事',
+    desc:'和对象在一起 3 年了，要不要走下一步？',
+    choices:[
+      { text:'A. 结婚，办个婚礼', effects:{ wealth:-25, happy:+20, career:-3 } },
+      { text:'B. 领证就好，不办婚礼', effects:{ wealth:-3, happy:+15 } },
+      { text:'C. 再等等，不着急', effects:{ happy:-3, smart:+3 } },
+    ]
+  },
+  {
+    id:'crossroad_baby',
+    icon:'👶',
+    title:'要不要生娃',
+    desc:'和另一半讨论生娃计划。',
+    choices:[
+      { text:'A. 生一个', effects:{ wealth:-20, happy:+18, career:-8, smart:+5 } },
+      { text:'B. 生两个', effects:{ wealth:-35, happy:+25, career:-15, smart:+5 } },
+      { text:'C. 丁克到底', effects:{ wealth:+10, happy:+5, career:+3 } },
+    ]
+  },
+  {
+    id:'crossroad_house',
+    icon:'🏠',
+    title:'买房问题',
+    desc:'父母催着买房，房价也在动。',
+    choices:[
+      { text:'A. 咬牙上车，30 年房贷', effects:{ wealth:-30, happy:-8, career:+8 } },
+      { text:'B. 老家买房，一线租房', effects:{ wealth:-15, happy:+5 } },
+      { text:'C. 坚持租房，保持自由', effects:{ wealth:+8, happy:+8 } },
+    ]
+  },
+  {
+    id:'crossroad_startup',
+    icon:'🚀',
+    title:'创业机会',
+    desc:'前同事拉你合伙创业，方向是你熟悉的领域。',
+    choices:[
+      { text:'A. 全职 all in', effects:{ career:+15, wealth:-25, happy:-5, smart:+15 } },
+      { text:'B. 兼职参与，只投小钱', effects:{ career:+5, wealth:-8, happy:+3, smart:+8 } },
+      { text:'C. 拒绝，稳定第一', effects:{ career:+3, wealth:+5, happy:+5 } },
+    ]
+  },
+  {
+    id:'crossroad_midcrisis',
+    icon:'😰',
+    title:'35 岁危机',
+    desc:'公司大规模裁员，你在名单边缘。',
+    choices:[
+      { text:'A. 主动谈 N+3 走人，休整一段', effects:{ career:-15, wealth:+15, happy:+15, smart:+8 } },
+      { text:'B. 卷起来求生存，加班表现', effects:{ career:+8, wealth:+3, happy:-15, smart:0 } },
+      { text:'C. 借机转行/考公', effects:{ career:-8, wealth:-5, happy:+10, smart:+15 } },
+    ]
+  },
+  {
+    id:'crossroad_lifegoal',
+    icon:'✈️',
+    title:'人生小转弯',
+    desc:'厌倦了当前的生活节奏，想改变。',
+    choices:[
+      { text:'A. 裸辞环游世界一年', effects:{ career:-20, wealth:-25, happy:+30, smart:+15 } },
+      { text:'B. 换个城市生活', effects:{ career:-5, wealth:-10, happy:+15 } },
+      { text:'C. 保持现状，忍忍就过了', effects:{ happy:-8, smart:+3 } },
+    ]
+  },
+];
+
+// ===== 转盘扇区 =====
+const WHEEL_SECTORS = [
+  { key:'career', label:'职场',  color:'#29adff', icon:'💼' },
+  { key:'wealth', label:'财富',  color:'#ffec27', icon:'💰' },
+  { key:'love',   label:'感情',  color:'#ff77a8', icon:'❤️' },
+  { key:'life',   label:'生活',  color:'#00e436', icon:'🏠' },
+  { key:'study',  label:'学习',  color:'#7e2553', icon:'📚' },
+  { key:'social', label:'社交',  color:'#ff8b3d', icon:'🤝' },
+  { key:'career', label:'职场',  color:'#29adff', icon:'💼' },
+  { key:'mystery',label:'奇遇',  color:'#c2c3c7', icon:'✨' },
+];
+
+// ===== 结局 =====
+const ENDINGS = [
+  { minCareer: 85, tag:'职场传奇', desc:'一路披荆斩棘，最终登顶事业巅峰。你的名字成了行业里的传说。' },
+  { minWealth: 85, tag:'财富自由', desc:'钱不再是问题，真正实现了想干嘛就干嘛的自由。' },
+  { minHappy:  85, tag:'幸福赢家', desc:'家人朋友环绕，日子过得舒心自在。什么叫圆满？你就是。' },
+  { minSmart:  85, tag:'智慧长者', desc:'读万卷书，行万里路。你成了别人眼中通透智慧的长辈。' },
+  { total: 300,    tag:'人生赢家', desc:'四维均衡发展，事业有成、家庭美满、财务健康、心态平和。羡慕的目光留给别人。' },
+  { total: 240,    tag:'佛系人生', desc:'不争不抢，随遇而安。日子平淡但也算过得去，60 岁开始享受慢生活。' },
+  { total: 180,    tag:'普通打工人', desc:'和大多数人一样，起起伏伏走完这一生。虽然没什么波澜壮阔，但也算完整。' },
+  { total: 120,    tag:'跌宕人生', desc:'一路坎坷，起起落落。回头看，有遗憾但也有回味。' },
+  { total: 0,      tag:'黯淡收场', desc:'年少的锋芒被岁月磨平，60 岁的你有些疲惫。也许下辈子重来会更好？' },
+];
+
+// ===== 状态 =====
+const state = {
+  name: '', edu: 'bachelor',
+  age: 22,
+  career: 50, wealth: 50, happy: 50, smart: 50,
+  history: [],
+  turnCount: 0,
+  maxTurns: 13,
+  isSpinning: false,
+  usedCrossroads: [],
+  gradPath: null,     // 毕业路径 key
+  gradSubPath: null,  // 就业子路径
+};
+
+const START_BONUS = {
+  edu: {
+    college:  { smart: -5, wealth: 5 },
+    bachelor: {},
+    master:   { smart: 10, wealth: -5, age: 3 },
+    phd:      { smart: 20, wealth: -10, happy: -5, age: 6 },
+  },
+};
+
+// ===== DOM =====
+const $ = id => document.getElementById(id);
+
+// ===== 转盘绘制 =====
+function drawWheel() {
+  const canvas = $('wheelCanvas');
+  const ctx = canvas.getContext('2d');
+  const cx = canvas.width / 2, cy = canvas.height / 2, r = cx - 4;
+  const n = WHEEL_SECTORS.length;
+  const anglePer = (Math.PI * 2) / n;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  WHEEL_SECTORS.forEach((sec, i) => {
+    const start = i * anglePer - Math.PI / 2;
+    const end = start + anglePer;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, start, end);
+    ctx.closePath();
+    ctx.fillStyle = sec.color;
+    ctx.fill();
+    ctx.strokeStyle = '#111';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    const midAngle = start + anglePer / 2;
+    const textR = r * 0.68;
+    const tx = Math.cos(midAngle) * textR;
+    const ty = Math.sin(midAngle) * textR;
+    ctx.translate(tx, ty);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#111';
+    ctx.font = 'bold 22px monospace';
+    ctx.fillText(sec.icon, 0, -10);
+    ctx.font = 'bold 14px "ZCOOL KuaiLe", "Courier New", monospace';
+    ctx.fillText(sec.label, 0, 12);
+    ctx.restore();
+  });
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, 40, 0, Math.PI * 2);
+  ctx.strokeStyle = '#111';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+}
+
+// ===== 初始化 =====
+$('goGradBtn').addEventListener('click', gotoGraduate);
+$('startBtn').addEventListener('click', startGame);
+
+function gotoGraduate() {
+  const name = $('playerName').value.trim();
+  if (!name) { alert('请输入你的名字～'); return; }
+  state.name = name;
+  state.edu = $('playerEdu').value;
+  const eduBonus = START_BONUS.edu[state.edu] || {};
+  state.age = 22 + (eduBonus.age || 0);
+  ['career','wealth','happy','smart'].forEach(k => {
+    state[k] += (eduBonus[k] || 0);
+    state[k] = Math.max(0, Math.min(100, state[k]));
+  });
+
+  $('setup').classList.add('hidden');
+  $('graduate').classList.add('active');
+  renderGraduate();
+}
+
+// ===== 毕业选择渲染 =====
+function renderGraduate() {
+  const box = $('gradOptions');
+  box.innerHTML = '';
+  $('gradTitle').textContent = `毕业后，${state.name} 想做什么？`;
+  $('gradAge').textContent = `${state.age} 岁 · ${eduLabel(state.edu)} 毕业`;
+
+  Object.entries(GRADUATE_PATHS).forEach(([key, path]) => {
+    const card = document.createElement('div');
+    card.className = 'grad-card';
+    card.innerHTML = `
+      <div class="grad-icon">${path.icon}</div>
+      <div class="grad-label">${path.label}</div>
+      <div class="grad-desc">${path.desc}</div>
+    `;
+    card.addEventListener('click', () => onGraduatePick(key));
+    box.appendChild(card);
+  });
+}
+
+function eduLabel(k) {
+  return { college:'大专', bachelor:'本科', master:'硕士', phd:'博士' }[k] || k;
+}
+
+function onGraduatePick(pathKey) {
+  const path = GRADUATE_PATHS[pathKey];
+  state.gradPath = pathKey;
+  if (path.hasSubChoice) {
+    renderGraduateSub(path);
+  } else {
+    // 直接应用效果
+    if (path.effects) applyStat(path.effects);
+    if (path.ageBonus) state.age += path.ageBonus;
+    state.history.push({ age: state.age, icon: path.icon, text: `毕业选择：${path.label} · ${path.desc}` });
+    startGame(path);
+  }
+}
+
+function renderGraduateSub(path) {
+  const box = $('gradOptions');
+  box.innerHTML = '';
+  $('gradTitle').textContent = path.subLabel;
+  $('gradAge').textContent = `已选：${path.icon} ${path.label}`;
+
+  path.subs.forEach(sub => {
+    const card = document.createElement('div');
+    card.className = 'grad-card';
+    card.innerHTML = `
+      <div class="grad-icon">${sub.icon}</div>
+      <div class="grad-label">${sub.label}</div>
+      <div class="grad-desc">${sub.desc}</div>
+    `;
+    card.addEventListener('click', () => {
+      state.gradSubPath = sub.id;
+      applyStat(sub.effects);
+      state.history.push({ age: state.age, icon: sub.icon, text: `毕业选择：${path.label} · ${sub.label}` });
+      startGame(path, sub);
+    });
+    box.appendChild(card);
+  });
+}
+
+function applyStat(effects) {
+  Object.entries(effects || {}).forEach(([k,v]) => {
+    if (k === 'age') return;
+    state[k] = Math.max(0, Math.min(100, state[k] + v));
+  });
+}
+
+// ===== 进入游戏 =====
+function startGame(gradPath, gradSub) {
+  $('graduate').classList.remove('active');
+  $('game').classList.add('active');
+  $('displayName').textContent = state.name;
+  const pathLabel = gradSub ? `${gradPath.label}·${gradSub.label}` : (gradPath ? gradPath.label : '');
+  $('displayPath').textContent = pathLabel;
+  drawWheel();
+  updateDisplay();
+}
+
+// ===== 更新显示 =====
+function updateDisplay() {
+  $('displayAge').textContent = state.age + ' 岁';
+  ['career','wealth','happy','smart'].forEach(k => {
+    const val = Math.max(0, Math.min(100, Math.round(state[k])));
+    $(`stat${cap(k)}`).textContent = val;
+    $(`fill${cap(k)}`).style.width = val + '%';
+    const fill = $(`fill${cap(k)}`);
+    if (val >= 70) fill.style.background = 'var(--pixel-green)';
+    else if (val >= 40) fill.style.background = 'var(--pixel-yellow)';
+    else fill.style.background = 'var(--pixel-red)';
+  });
+}
+function cap(s) { return s[0].toUpperCase() + s.slice(1); }
+
+// ===== 转盘逻辑 =====
+let wheelRotation = 0;
+$('spinBtn').addEventListener('click', spin);
+
+function spin() {
+  if (state.isSpinning) return;
+  state.isSpinning = true;
+  $('spinBtn').disabled = true;
+
+  const weights = getSectorWeights();
+  const targetIdx = weightedPick(weights);
+  const anglePer = 360 / WHEEL_SECTORS.length;
+  const targetAngle = targetIdx * anglePer + anglePer / 2;
+  const spins = 5 + Math.floor(Math.random() * 3);
+  wheelRotation += spins * 360 + (360 - targetAngle - (wheelRotation % 360));
+  $('wheelCanvas').style.transform = `rotate(${wheelRotation}deg)`;
+
+  setTimeout(() => {
+    const sector = WHEEL_SECTORS[targetIdx];
+    triggerEvent(sector.key, sector.label);
+  }, 4100);
+}
+
+function getSectorWeights() {
+  // 根据毕业路径调整权重
+  const base = WHEEL_SECTORS.map(() => 1);
+  const pathBoost = {
+    'employ_bigtech':  { career: 1.5, wealth: 1.3 },
+    'employ_midtech':  { career: 1.2, life: 1.2 },
+    'employ_foreign':  { life: 1.5, love: 1.3 },
+    'employ_stateown': { life: 1.4, social: 1.3 },
+    'employ_startup':  { mystery: 1.6, career: 1.3, wealth: 1.2 },
+    'employ_freelance':{ mystery: 1.4, life: 1.3, study: 1.3 },
+    'study':   { study: 1.6, mystery: 1.2 },
+    'gaokao':  { life: 1.4, social: 1.3, love: 1.2 },
+    'gapyear': { mystery: 1.5, life: 1.3, love: 1.2 },
+  };
+  const key = state.gradSubPath ? `${state.gradPath}_${state.gradSubPath}` : state.gradPath;
+  const boost = pathBoost[key] || {};
+  WHEEL_SECTORS.forEach((sec, i) => {
+    if (boost[sec.key]) base[i] *= boost[sec.key];
+  });
+  return base;
+}
+
+function weightedPick(weights) {
+  const total = weights.reduce((a,b)=>a+b, 0);
+  let r = Math.random() * total;
+  for (let i = 0; i < weights.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return i;
+  }
+  return weights.length - 1;
+}
+
+// ===== 触发事件 =====
+function triggerEvent(categoryKey, categoryLabel) {
+  const pool = EVENTS[categoryKey];
+  const ev = pool[Math.floor(Math.random() * pool.length)];
+
+  showEventModal({
+    icon: ev.icon, category: categoryLabel, title: ev.title, desc: ev.desc,
+    effects: ev.effects, choices: ev.choices,
+    onDone: (choiceText, effects) => finishEvent(ev, choiceText, effects, false)
+  });
+}
+
+function showEventModal({ icon, category, title, desc, effects, choices, onDone, isCrossroad }) {
+  $('eventIcon').textContent = icon;
+  $('eventCategory').textContent = (isCrossroad ? '🔀 人生岔路 · ' : '') + category.toUpperCase();
+  $('eventTitle').textContent = title;
+  $('eventDesc').textContent = desc;
+
+  const card = $('eventModal').querySelector('.event-card');
+  card.classList.toggle('crossroad', !!isCrossroad);
+
+  const effectsBox = $('eventEffects');
+  const choicesBox = $('eventChoices');
+  effectsBox.innerHTML = '';
+  choicesBox.innerHTML = '';
+
+  if (choices && choices.length) {
+    choices.forEach(ch => {
+      const btn = document.createElement('button');
+      btn.className = 'choice-btn';
+      btn.textContent = ch.text;
+      btn.onclick = () => {
+        // 显示效果，再等用户点"继续"
+        effectsBox.innerHTML = '';
+        renderEffects(ch.effects, effectsBox);
+        choicesBox.innerHTML = '';
+        const next = document.createElement('button');
+        next.className = 'close-event-btn';
+        next.textContent = '继续人生 →';
+        next.onclick = () => {
+          $('eventModal').classList.remove('active');
+          onDone(ch.text, ch.effects);
+        };
+        choicesBox.appendChild(next);
+      };
+      choicesBox.appendChild(btn);
+    });
+  } else {
+    renderEffects(effects, effectsBox);
+    const btn = document.createElement('button');
+    btn.className = 'close-event-btn';
+    btn.textContent = '继续人生 →';
+    btn.onclick = () => {
+      $('eventModal').classList.remove('active');
+      onDone(null, effects);
+    };
+    choicesBox.appendChild(btn);
+  }
+
+  $('eventModal').classList.add('active');
+}
+
+function renderEffects(effects, container) {
+  const labels = { career:'💼事业', wealth:'💰财富', happy:'❤️幸福', smart:'🧠智力' };
+  Object.entries(effects || {}).forEach(([k, v]) => {
+    if (!v || k === 'age') return;
+    const tag = document.createElement('div');
+    tag.className = 'effect-tag ' + (v > 0 ? 'positive' : 'negative');
+    tag.textContent = `${labels[k]} ${v > 0 ? '+' : ''}${v}`;
+    container.appendChild(tag);
+  });
+}
+
+function finishEvent(ev, choiceText, effects, isCrossroad) {
+  applyStat(effects);
+  const summary = choiceText ? `${ev.title}（${choiceText.replace(/^[ABC]\. /, '')}）` : ev.title;
+  state.history.push({ age: state.age, icon: ev.icon, text: summary });
+  renderHistory();
+  state.age += 3;
+  state.turnCount++;
+  updateDisplay();
+
+  if (state.turnCount >= state.maxTurns) {
+    setTimeout(showEnding, 600);
+    return;
+  }
+
+  // 每 3 轮触发一个岔路（第 3、6、9、12 轮结束后）
+  if (!isCrossroad && state.turnCount % 3 === 0) {
+    setTimeout(triggerCrossroad, 500);
+  } else {
+    state.isSpinning = false;
+    $('spinBtn').disabled = false;
+  }
+}
+
+function triggerCrossroad() {
+  const available = CROSSROADS.filter(c => !state.usedCrossroads.includes(c.id));
+  if (available.length === 0) {
+    state.isSpinning = false;
+    $('spinBtn').disabled = false;
+    return;
+  }
+  const cr = available[Math.floor(Math.random() * available.length)];
+  state.usedCrossroads.push(cr.id);
+
+  showEventModal({
+    icon: cr.icon,
+    category: cr.title,
+    title: cr.title,
+    desc: cr.desc,
+    choices: cr.choices,
+    isCrossroad: true,
+    onDone: (choiceText, effects) => finishEvent(cr, choiceText, effects, true)
+  });
+}
+
+function renderHistory() {
+  $('historyList').innerHTML = state.history.slice().reverse().map(h =>
+    `<div class="history-item"><span class="history-age">${h.age}岁</span> ${h.icon} ${h.text}</div>`
+  ).join('');
+}
+
+// ===== 结局 =====
+function showEnding() {
+  $('game').classList.remove('active');
+  $('game').style.display = 'none';
+  $('ending').classList.add('active');
+
+  const c = Math.round(state.career), w = Math.round(state.wealth),
+        h = Math.round(state.happy), s = Math.round(state.smart);
+  const total = c + w + h + s;
+
+  let ending = ENDINGS[ENDINGS.length - 1];
+  for (const e of ENDINGS) {
+    if (e.minCareer && c >= e.minCareer) { ending = e; break; }
+    if (e.minWealth && w >= e.minWealth) { ending = e; break; }
+    if (e.minHappy && h >= e.minHappy) { ending = e; break; }
+    if (e.minSmart && s >= e.minSmart) { ending = e; break; }
+    if (e.total !== undefined && total >= e.total) { ending = e; break; }
+  }
+  $('endingTag').textContent = ending.tag;
+  $('endingDesc').textContent = ending.desc;
+  $('finalCareer').textContent = c;
+  $('finalWealth').textContent = w;
+  $('finalHappy').textContent = h;
+  $('finalSmart').textContent = s;
+
+  // 生成人生总结
+  $('lifeSummary').textContent = buildLifeSummary(ending, { c, w, h, s, total });
+}
+
+// ===== 人生总结生成 =====
+function buildLifeSummary(ending, stats) {
+  const { c, w, h, s } = stats;
+  const name = state.name || '这位朋友';
+  const eduMap = { college:'大专', bachelor:'本科', master:'硕士', phd:'博士' };
+  const edu = eduMap[state.edu] || '本科';
+
+  // 毕业选择描述
+  const gradPath = GRADUATE_PATHS[state.gradPath];
+  let gradText = '';
+  if (gradPath) {
+    if (state.gradSubPath) {
+      const sub = gradPath.subs.find(x => x.id === state.gradSubPath);
+      gradText = `${edu}毕业后，你选择进入${sub ? sub.label : gradPath.label}，开启了职业生涯。`;
+    } else if (state.gradPath === 'study') {
+      gradText = `${edu}毕业后，你没有着急工作，选择继续深造。`;
+    } else if (state.gradPath === 'gaokao') {
+      gradText = `${edu}毕业后，你选择备考公务员，踏上了体制内的道路。`;
+    } else if (state.gradPath === 'gapyear') {
+      gradText = `${edu}毕业后，你没有立刻进入职场，而是选择 Gap Year，先去看看世界。`;
+    } else {
+      gradText = `${edu}毕业后，你选择了${gradPath.label}。`;
+    }
+  }
+
+  // 属性维度画像（4 维强弱分析）
+  const dims = [
+    { key:'career', name:'事业', val:c, high:'事业上你走到了别人仰望的位置', mid:'事业稳中有进，算得上体面', low:'事业不算顺利，一直在起伏里挣扎' },
+    { key:'wealth', name:'财富', val:w, high:'财富自由早已不是梦想', mid:'手头宽裕，日子过得踏实', low:'钱包一直是心事，紧巴巴地过' },
+    { key:'happy',  name:'幸福', val:h, high:'心态平和，笑容多，是身边人羡慕的对象', mid:'情绪起伏在正常范围，日子有滋有味', low:'心里总有些拧巴，快乐来得少去得快' },
+    { key:'smart',  name:'智力', val:s, high:'读万卷书行万里路，谈吐里藏着智慧', mid:'保持学习习惯，认知在稳步生长', low:'停止了成长，认知固化在了年轻时' },
+  ];
+  const dimText = (d) => d.val >= 75 ? d.high : d.val >= 45 ? d.mid : d.low;
+
+  const strongest = dims.slice().sort((a,b)=>b.val-a.val)[0];
+  const weakest = dims.slice().sort((a,b)=>a.val-b.val)[0];
+
+  // 事件回顾：从 history 里抽 3 个关键事件（首、中、末）
+  const events = state.history.filter(h => !h.text.startsWith('毕业选择'));
+  let eventText = '';
+  if (events.length >= 3) {
+    const first = events[0];
+    const mid = events[Math.floor(events.length / 2)];
+    const last = events[events.length - 1];
+    eventText = `\n\n回望这几十年：\n· 年轻时（${first.age}岁）遇到"${first.text}"，让你第一次感受到人生的变数；\n· 中年时（${mid.age}岁）经历了"${mid.text}"，这段经历影响深远；\n· 而在人生的后半段（${last.age}岁）"${last.text}"，为这一生画上了独特的一笔。`;
+  } else if (events.length > 0) {
+    eventText = `\n\n这一路走来，"${events[events.length-1].text}" 是你印象最深的一段经历。`;
+  }
+
+  // 岔路回顾（人生重大决策）
+  const usedCr = state.usedCrossroads.length;
+  let crText = '';
+  if (usedCr > 0) {
+    crText = `\n\n人生的岔路口，你做了 ${usedCr} 次重要选择——${usedCr >= 3 ? '有些选对了，有些回头看未必最优' : '每一步都算数'}，但正是这些决定塑造了今天的你。`;
+  }
+
+  // 结尾金句
+  const closingMap = {
+    '职场传奇': '如果重来一次，你大概还是会选这条路。',
+    '财富自由': '钱不是万能的，但没有钱是万万不能的——这句话你比谁都懂。',
+    '幸福赢家': '别人问你成功的秘诀，你只会笑着说：不较劲。',
+    '智慧长者': '晚辈们喜欢来找你聊天，因为你总能给出他们没想过的角度。',
+    '人生赢家': '四平八稳，各得其所，这就是所谓的圆满吧。',
+    '佛系人生': '不焦虑不攀比，日子慢慢过，这也是一种赢。',
+    '普通打工人': '和大多数人一样，起起落落，但你活出了自己的节奏。',
+    '跌宕人生': '大起大落都经历过，回头看，这才叫真正活过。',
+    '黯淡收场': '如果人生可以重来……下一局，一定会不一样。',
+  };
+  const closing = closingMap[ending.tag] || '这就是属于你的人生。';
+
+  const summary =
+    `${name}（${edu}），60 岁。\n\n` +
+    `${gradText}` +
+    `${eventText}` +
+    `${crText}\n\n` +
+    `到了这个年纪回头看：${dimText(strongest)}，但${dimText(weakest)}。` +
+    `最终你以「${ending.tag}」收场——${ending.desc}\n\n` +
+    `${closing}`;
+
+  return summary;
+}
+
+// ===== 复制 & 分享 =====
+function copySummary() {
+  const text = $('lifeSummary').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    alert('已复制到剪贴板，可以发给朋友炫耀啦～');
+  }).catch(() => {
+    // 兜底
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    alert('已复制到剪贴板～');
+  });
+}
+
+function shareSummary() {
+  const tag = $('endingTag').textContent;
+  const c = $('finalCareer').textContent, w = $('finalWealth').textContent,
+        h = $('finalHappy').textContent, s = $('finalSmart').textContent;
+  const summary = $('lifeSummary').textContent;
+  const shareText =
+    `🎮 我在【人生转盘】里的结局是：${tag}\n\n` +
+    `💼事业 ${c} | 💰财富 ${w}\n` +
+    `❤️幸福 ${h} | 🧠智力 ${s}\n\n` +
+    `${summary}\n\n` +
+    `———\n你也来玩一把：${location.href.split('#')[0]}`;
+  navigator.clipboard.writeText(shareText).then(() => {
+    alert('战绩卡已复制，粘贴到群里让大家看看你的人生～');
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = shareText;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    alert('战绩卡已复制～');
+  });
+}
+
+</script>
+</body>
+</html>
