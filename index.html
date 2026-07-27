@@ -1046,6 +1046,14 @@ const EVENTS = {
     { icon:'🧘', title:'开始冥想', desc:'每天 10 分钟冥想，焦虑少了很多。', minAge:28, effects:{ happy:+10, smart:+5 } },
     { icon:'🏊', title:'学会了游泳', desc:'30 多岁学会游泳，谁说晚了？', minAge:28, effects:{ happy:+8, smart:+3 } },
     { icon:'🛋️', title:'宅家的一年', desc:'这一年几乎没出门社交，省钱但有点闷。', effects:{ wealth:+8, happy:-5 } },
+    // --- 老年专属 ---
+    { icon:'🌅', title:'退休生活开启', desc:'正式退休了，时间终于完全属于自己。', minAge:58, effects:{ happy:+15, career:-5 } },
+    { icon:'💃', title:'广场舞C位', desc:'你成了小区广场舞的领舞，粉丝一堆。', minAge:60, effects:{ happy:+12 } },
+    { icon:'🎣', title:'钓鱼的一整天', desc:'一竿一椅一下午，什么都没钓到但很快乐。', minAge:55, effects:{ happy:+10 } },
+    { icon:'✈️', title:'老两口游世界', desc:'和老伴报了旅行团，把年轻时想去的地方走了一遍。', minAge:60, require: s => s.married, effects:{ happy:+18, wealth:-12 } },
+    { icon:'👶', title:'抱上孙辈了', desc:'家里添了小孙子/孙女，你成了带娃主力。', minAge:55, require: s => s.hasKid, effects:{ happy:+18, smart:+3 } },
+    { icon:'🧓', title:'老年大学报名', desc:'在老年大学学书法/摄影，同学都是老伙计。', minAge:60, effects:{ happy:+10, smart:+10 } },
+    { icon:'🩺', title:'慢性病来敲门', desc:'血压血糖开始不听话，药盒成了随身物。', minAge:58, effects:{ happy:-8, wealth:-8 } },
   ],
 
   study: [
@@ -1093,6 +1101,9 @@ const EVENTS = {
     { icon:'💌', title:'收到十年前的信', desc:'大学时写给未来自己的信寄到了。', minAge:30, effects:{ happy:+12, smart:+5 } },
     { icon:'🎬', title:'当了回群众演员', desc:'剧组来取景，你混了个镜头。', effects:{ happy:+8 } },
     { icon:'🛸', title:'彻夜看了场流星雨', desc:'和重要的人一起看了流星雨。', effects:{ happy:+12 } },
+    // --- 致命意外（低概率）---
+    { icon:'🕊️', title:'突如其来的意外', desc:'一场谁也没料到的意外，人生定格在了这一刻。', fatal:true, chance:0.3, minAge:25, effects:{} },
+    { icon:'🏥', title:'没能扛过去的大病', desc:'医生的诊断书像晴天霹雳。这一次，没能扛过去。', fatal:true, chance:0.35, minAge:50, effects:{} },
   ],
 };
 
@@ -1269,7 +1280,7 @@ const state = {
   career: 50, wealth: 50, happy: 50, smart: 50,
   history: [],
   turnCount: 0,
-  maxTurns: 13,
+  maxTurns: 26,          // 上限 ~100 岁，实际由死亡判定决定
   isSpinning: false,
   usedCrossroads: [],
   gradPath: null,
@@ -1283,6 +1294,9 @@ const state = {
   hasKid: false,
   hasHouse: false,
   peakLevel: 0,
+  // v3.1 死亡机制
+  dead: false,
+  deathCause: null,     // 'accident' | 'illness' | 'natural'
 };
 
 const START_BONUS = {
@@ -1565,7 +1579,27 @@ function triggerEvent(categoryKey, categoryLabel) {
   let pool = eligibleEvents(EVENTS[categoryKey]);
   if (pool.length === 0) pool = eligibleEvents(EVENTS.life); // 兜底
   if (pool.length === 0) pool = EVENTS.life;
-  const ev = pool[Math.floor(Math.random() * pool.length)];
+  let ev = pool[Math.floor(Math.random() * pool.length)];
+
+  // 致命事件：按 chance 概率生效，否则重抽一个非致命事件
+  if (ev.fatal) {
+    if (Math.random() > (ev.chance || 0.3)) {
+      const safe = pool.filter(e => !e.fatal);
+      ev = safe.length ? safe[Math.floor(Math.random() * safe.length)] : ev;
+    }
+  }
+
+  if (ev.fatal) {
+    showEventModal({
+      icon: ev.icon, category: categoryLabel, title: ev.title, desc: ev.desc,
+      effects: {}, choices: null,
+      onDone: () => {
+        state.history.push({ age: state.age, icon: ev.icon, text: ev.title });
+        die(ev.minAge >= 50 ? 'illness' : 'accident');
+      }
+    });
+    return;
+  }
 
   showEventModal({
     icon: ev.icon, category: categoryLabel, title: ev.title, desc: ev.desc,
@@ -1575,6 +1609,14 @@ function triggerEvent(categoryKey, categoryLabel) {
       finishEvent(ev, choiceText, effects, false);
     }
   });
+}
+
+// ===== 死亡 =====
+function die(cause) {
+  state.dead = true;
+  state.deathCause = cause;
+  renderHistory();
+  setTimeout(showEnding, 400);
 }
 
 function showEventModal({ icon, category, title, desc, effects, choices, setFlag, onDone, isCrossroad }) {
@@ -1650,8 +1692,17 @@ function finishEvent(ev, choiceText, effects, isCrossroad) {
   state.turnCount++;
   updateDisplay();
 
+  // ---- 自然死亡判定：76 岁起，每轮概率随年龄递增 ----
+  if (state.age >= 76) {
+    // 76岁:25% → 79:35% → 82:50% → 85:65% → 88:80% → 91+:95%
+    const p = Math.min(0.95, 0.25 + (state.age - 76) / 3 * 0.15);
+    if (Math.random() < p || state.turnCount >= state.maxTurns) {
+      die('natural');
+      return;
+    }
+  }
   if (state.turnCount >= state.maxTurns) {
-    setTimeout(showEnding, 600);
+    die('natural');
     return;
   }
 
@@ -1710,12 +1761,19 @@ function showEnding() {
   const total = c + w + h + s;
 
   let ending = ENDINGS[ENDINGS.length - 1];
-  for (const e of ENDINGS) {
-    if (e.minCareer && c >= e.minCareer) { ending = e; break; }
-    if (e.minWealth && w >= e.minWealth) { ending = e; break; }
-    if (e.minHappy && h >= e.minHappy) { ending = e; break; }
-    if (e.minSmart && s >= e.minSmart) { ending = e; break; }
-    if (e.total !== undefined && total >= e.total) { ending = e; break; }
+  // 早逝专属结局
+  if (state.deathCause === 'accident' && state.age < 55) {
+    ending = { tag:'天妒英才', desc:`人生本来还有无限可能，却在 ${state.age} 岁戛然而止。愿来世平安顺遂。` };
+  } else if (state.deathCause === 'illness' && state.age < 65) {
+    ending = { tag:'英年早逝', desc:`病魔无情。${state.age} 岁的你带着未完成的心愿离开了。` };
+  } else {
+    for (const e of ENDINGS) {
+      if (e.minCareer && c >= e.minCareer) { ending = e; break; }
+      if (e.minWealth && w >= e.minWealth) { ending = e; break; }
+      if (e.minHappy && h >= e.minHappy) { ending = e; break; }
+      if (e.minSmart && s >= e.minSmart) { ending = e; break; }
+      if (e.total !== undefined && total >= e.total) { ending = e; break; }
+    }
   }
 
   // 职级成就覆盖：达到晋升线顶级/次顶级，结局标签升级
@@ -1729,7 +1787,10 @@ function showEnding() {
   };
   let levelTitle = track ? track.levels[state.level] : '';
 
-  if ($('endingTitle')) $('endingTitle').textContent = `✨ ${state.age} 岁 · 人生总结 ✨`;
+  if ($('endingTitle')) {
+    const causeLabel = { accident:'💫 意外离世', illness:'🏥 因病离世', natural:'🕊️ 寿终正寝' }[state.deathCause] || '';
+    $('endingTitle').textContent = `✨ ${state.age} 岁 · ${causeLabel || '人生总结'} ✨`;
+  }
   $('endingTag').textContent = ending.tag;
   $('endingDesc').textContent = ending.desc;
   $('finalCareer').textContent = c;
@@ -1832,7 +1893,21 @@ function buildLifeSummary(ending, stats, levelTitle) {
   };
   const closing = closingMap[ending.tag] || '这就是属于你的人生。';
 
-  return `${name}（${edu}），${state.age} 岁。\n\n` +
+  // 寿命开场白
+  let lifeSpanText;
+  if (state.deathCause === 'accident') {
+    lifeSpanText = `${name}（${edu}），生命停在了 ${state.age} 岁——一场意外带走了一切。`;
+  } else if (state.deathCause === 'illness') {
+    lifeSpanText = `${name}（${edu}），${state.age} 岁因病离世。`;
+  } else if (state.age >= 90) {
+    lifeSpanText = `${name}（${edu}），享年 ${state.age} 岁——妥妥的长寿人生。`;
+  } else if (state.age >= 76) {
+    lifeSpanText = `${name}（${edu}），享年 ${state.age} 岁，走完了完整的一生。`;
+  } else {
+    lifeSpanText = `${name}（${edu}），${state.age} 岁。`;
+  }
+
+  return `${lifeSpanText}\n\n` +
     `${gradText}${careerText}\n\n${familyText}` +
     `${eventText}${crText}\n\n` +
     `到了这个年纪回头看：${dimText(strongest)}，但${dimText(weakest)}。` +
