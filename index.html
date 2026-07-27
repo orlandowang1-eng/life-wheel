@@ -223,8 +223,8 @@
 
   .status-bar {
     display: grid;
-    grid-template-columns: 1fr 1.5fr 1fr;
-    gap: 15px;
+    grid-template-columns: 1fr 1.3fr 1.3fr 0.8fr;
+    gap: 12px;
     margin-bottom: 20px;
     padding: 15px 20px;
     background: var(--bg-dark);
@@ -555,6 +555,12 @@
   }
 
   .history-item:last-child { border-bottom: none; }
+
+  .history-item.promo {
+    color: var(--pixel-yellow);
+    font-weight: bold;
+    background: rgba(255, 236, 39, 0.08);
+  }
   .history-age { color: var(--pixel-yellow); font-weight: bold; }
 
   /* ---- Ending Screen ---- */
@@ -707,6 +713,10 @@
         <span class="status-value" id="displayPath">-</span>
       </div>
       <div class="status-item">
+        <span class="status-label">职级</span>
+        <span class="status-value" id="displayLevel">-</span>
+      </div>
+      <div class="status-item">
         <span class="status-label">年龄</span>
         <span class="status-value" id="displayAge">-</span>
       </div>
@@ -756,7 +766,7 @@
   <!-- ===== ENDING SCREEN ===== -->
   <div class="ending" id="ending">
     <div class="ending-card">
-      <div class="ending-title">✨ 60 岁 · 人生总结 ✨</div>
+      <div class="ending-title" id="endingTitle">✨ 人生总结 ✨</div>
       <div class="ending-tag" id="endingTag">-</div>
       <div class="ending-desc" id="endingDesc">-</div>
       <div class="final-stats">
@@ -795,11 +805,85 @@
 
 <script>
 // ============================================================
-// 人生转盘 v2
-// - 起始：毕业选择（就业/升学/考公/gap year），就业展开公司类型
-// - 玩法：转盘随机事件 + 每 3 轮一个人生岔路节点
-// - 4 维属性：事业/财富/幸福/智力
+// 人生转盘 v3
+// - 五条职业晋升线（企业/学术/公务员/创业/自由职业）
+// - 事件带年龄窗口 + 状态门槛（已婚才生娃等）
+// - 家庭扇区 + 更丰富的事件池
 // ============================================================
+
+// ===== 职业晋升线 =====
+// 每条线：levels 数组，晋升靠 "晋升点数"（promo），事件/岔路可以加 promo
+const CAREER_TRACKS = {
+  corporate: {
+    name: '企业线',
+    levels: ['普通员工', '组长', '主管', '部门经理', '总监', 'VP', 'CEO'],
+    promoNeed: [0, 15, 30, 50, 75, 105, 140], // 累计晋升点数门槛
+    levelBonus: [
+      {},
+      { career:+5, wealth:+5 },
+      { career:+6, wealth:+8 },
+      { career:+8, wealth:+10, happy:-3 },
+      { career:+10, wealth:+15, happy:-5 },
+      { career:+12, wealth:+20, happy:-5 },
+      { career:+15, wealth:+30, happy:-8 },
+    ],
+  },
+  academic: {
+    name: '学术线',
+    levels: ['研究生', '博士生', '博士后', '讲师', '副教授', '教授', '院士'],
+    promoNeed: [0, 12, 26, 42, 62, 88, 130],
+    levelBonus: [
+      {},
+      { smart:+8, wealth:-3 },
+      { smart:+10, career:+5 },
+      { smart:+8, career:+8, wealth:+5 },
+      { smart:+10, career:+10, wealth:+8 },
+      { smart:+12, career:+15, wealth:+10, happy:+5 },
+      { smart:+15, career:+20, wealth:+15, happy:+10 },
+    ],
+  },
+  civil: {
+    name: '体制线',
+    levels: ['科员', '副科长', '科长', '副处长', '处长', '厅长', '部长', '正国级'],
+    promoNeed: [0, 12, 25, 40, 58, 82, 115, 160],
+    levelBonus: [
+      {},
+      { career:+5, happy:+3 },
+      { career:+6, happy:+3, wealth:+3 },
+      { career:+8, happy:+3, wealth:+5 },
+      { career:+10, wealth:+8, happy:+5 },
+      { career:+12, wealth:+10, happy:+5 },
+      { career:+15, wealth:+12, happy:+8 },
+      { career:+20, wealth:+15, happy:+10 },
+    ],
+  },
+  startup: {
+    name: '创业线',
+    levels: ['小作坊老板', '天使轮创始人', 'A轮CEO', 'B轮CEO', 'C轮CEO', '独角兽掌门人', '上市公司董事长'],
+    promoNeed: [0, 14, 30, 48, 70, 100, 140],
+    levelBonus: [
+      {},
+      { career:+8, wealth:+5, happy:-3 },
+      { career:+10, wealth:+10, happy:-5 },
+      { career:+10, wealth:+15, happy:-5 },
+      { career:+12, wealth:+20, happy:-3 },
+      { career:+15, wealth:+30, happy:+5 },
+      { career:+20, wealth:+40, happy:+10 },
+    ],
+  },
+  freelance: {
+    name: '自由线',
+    levels: ['自由新人', '小有名气', '垂类达人', '头部创作者', '行业标杆'],
+    promoNeed: [0, 15, 35, 65, 105],
+    levelBonus: [
+      {},
+      { career:+5, wealth:+5, happy:+5 },
+      { career:+8, wealth:+10, happy:+5 },
+      { career:+10, wealth:+20, happy:+8 },
+      { career:+15, wealth:+30, happy:+10 },
+    ],
+  },
+};
 
 // ===== 毕业选择 =====
 const GRADUATE_PATHS = {
@@ -809,227 +893,346 @@ const GRADUATE_PATHS = {
     desc: '直接进入职场，开始搬砖生涯',
     hasSubChoice: true,
     subLabel: '选个公司类型',
+    track: 'corporate',
     subs: [
-      { id:'bigtech', label:'大厂', icon:'🏢', desc:'福利好但内卷严重', effects:{ career:+8, wealth:+15, happy:-5, smart:+5 } },
-      { id:'midtech', label:'中厂', icon:'🏬', desc:'节奏适中，成长稳定', effects:{ career:+5, wealth:+8, happy:+5, smart:+3 } },
-      { id:'foreign', label:'外企', icon:'🌐', desc:'work-life balance 之神', effects:{ career:+3, wealth:+10, happy:+15, smart:+5 } },
-      { id:'stateown', label:'国企', icon:'🏛️', desc:'稳定养老，父母的最爱', effects:{ career:+2, wealth:+5, happy:+12, smart:0 } },
-      { id:'startup', label:'创业公司', icon:'🚀', desc:'一夜暴富或一夜归零', effects:{ career:+12, wealth:-5, happy:-3, smart:+10 } },
-      { id:'freelance', label:'自由职业', icon:'🎨', desc:'为爱发电，快乐至上', effects:{ career:-5, wealth:-3, happy:+20, smart:+8 } },
+      { id:'bigtech', label:'大厂', icon:'🏢', desc:'福利好但内卷严重', effects:{ career:+8, wealth:+15, happy:-5, smart:+5 }, promoRate:1.2 },
+      { id:'midtech', label:'中厂', icon:'🏬', desc:'节奏适中，成长稳定', effects:{ career:+5, wealth:+8, happy:+5, smart:+3 }, promoRate:1.0 },
+      { id:'foreign', label:'外企', icon:'🌐', desc:'work-life balance 之神', effects:{ career:+3, wealth:+10, happy:+15, smart:+5 }, promoRate:0.8 },
+      { id:'stateown', label:'国企', icon:'🏛️', desc:'稳定养老，父母的最爱', effects:{ career:+2, wealth:+5, happy:+12, smart:0 }, promoRate:0.7 },
+      { id:'startupco', label:'创业公司', icon:'🚀', desc:'一夜暴富或一夜归零', effects:{ career:+12, wealth:-5, happy:-3, smart:+10 }, promoRate:1.5 },
+      { id:'freelance', label:'自由职业', icon:'🎨', desc:'为爱发电，快乐至上', effects:{ career:-5, wealth:-3, happy:+20, smart:+8 }, track:'freelance', promoRate:1.0 },
     ]
   },
   study: {
-    label: '升学',
+    label: '升学深造',
     icon: '🎓',
-    desc: '继续深造，考研/读博或出国',
+    desc: '读研读博，走学术道路',
     effects: { career:-5, wealth:-15, happy:+5, smart:+25 },
-    ageBonus: 3, // 出来时年龄+3
+    ageBonus: 3,
+    track: 'academic',
   },
   gaokao: {
-    label: '考公',
+    label: '考公上岸',
     icon: '🏛️',
-    desc: '铁饭碗，一家人整整齐齐',
+    desc: '进入体制，为人民服务',
     effects: { career:+3, wealth:+5, happy:+18, smart:+5 },
+    track: 'civil',
+  },
+  startup: {
+    label: '直接创业',
+    icon: '🚀',
+    desc: '不打工！自己当老板',
+    effects: { career:+5, wealth:-20, happy:+5, smart:+10 },
+    track: 'startup',
   },
   gapyear: {
     label: 'Gap Year',
     icon: '🌍',
-    desc: '不着急工作，先出去看看世界',
+    desc: '不着急，先出去看看世界',
     effects: { career:-10, wealth:-15, happy:+25, smart:+15 },
+    track: 'freelance',
   },
 };
 
 // ===== 事件池 =====
-// 分为 8 类，每 event 可含 choices（二选一）
+// 事件字段：minAge/maxAge 年龄窗口；require: fn(state)=>bool 状态门槛；
+// track: 仅该晋升线可见；effects 可含 promo（晋升点数）
 const EVENTS = {
   career: [
-    { icon:'📈', title:'季度绩效 A+', desc:'你的绩效被评为 A+，主管在全组会上点名表扬。', effects:{ career:+10, wealth:+5, happy:+5 } },
-    { icon:'📉', title:'项目失败', desc:'负责的项目 KPI 没达成，被主管当面复盘。', effects:{ career:-10, happy:-8, smart:+3 } },
-    { icon:'🎯', title:'完成一个大项目', desc:'历时半年的项目上线，数据很好看。', effects:{ career:+12, wealth:+8, smart:+5 } },
-    { icon:'🏆', title:'年度优秀员工', desc:'年会上你被点名表彰，还有一笔奖金。', effects:{ career:+15, wealth:+15, happy:+10 } },
-    { icon:'😤', title:'和主管吵架了', desc:'方案理念冲突，你和主管当场 argue 起来。', effects:{ career:-8, happy:-5, smart:+3 } },
-    { icon:'💤', title:'工作躺平期', desc:'找到了摸鱼的节奏，日子过得很松弛。', effects:{ career:-5, happy:+10, smart:-3 } },
-    { icon:'🔥', title:'部门大重组', desc:'部门大调整，你被划到新业务线，什么都要从头学。', effects:{ career:-3, happy:-5, smart:+8 } },
-    { icon:'📝', title:'向上管理成功', desc:'你成功让老板认可了你的方案。', effects:{ career:+10, happy:+8, smart:+5 } },
-    { icon:'😩', title:'背了一口锅', desc:'同事捅的娄子最后算到你头上。', effects:{ career:-8, happy:-10, smart:+5 } },
-    { icon:'🤝', title:'带教新人', desc:'公司安排你带一个新同事。', effects:{ career:+5, happy:+5, smart:+8 } },
-    { icon:'☕', title:'茶水间八卦', desc:'茶水间听到了组织架构调整的小道消息。', effects:{ career:+3, happy:+3, smart:+5 } },
-    { icon:'🎤', title:'第一次做公开分享', desc:'部门大会上做了一次专题分享，紧张但很有成就感。', effects:{ career:+8, happy:+8, smart:+10 } },
+    // --- 通用职场 ---
+    { icon:'📈', title:'绩效拿了 A+', desc:'季度绩效 A+，全组会上被点名表扬。', maxAge:55, effects:{ career:+10, wealth:+5, happy:+5, promo:+6 } },
+    { icon:'📉', title:'项目黄了', desc:'跟了半年的项目被砍，心血付诸东流。', maxAge:55, effects:{ career:-8, happy:-8, smart:+3 } },
+    { icon:'🏆', title:'年度优秀员工', desc:'年会上台领奖，还有一笔奖金。', maxAge:55, effects:{ career:+12, wealth:+12, happy:+10, promo:+8 } },
+    { icon:'😤', title:'和上级吵架', desc:'方案理念冲突，你和上级当场 argue。', maxAge:50, effects:{ career:-6, happy:-5, smart:+3 } },
+    { icon:'💤', title:'摸鱼的快乐', desc:'找到了摸鱼节奏，日子松弛了。', effects:{ career:-4, happy:+10, smart:-3, promo:-3 } },
+    { icon:'😩', title:'背锅侠', desc:'别人捅的娄子算到你头上。', maxAge:50, effects:{ career:-8, happy:-10, smart:+5 } },
+    { icon:'🎤', title:'公开分享出圈', desc:'一次分享讲得特别好，很多人认识了你。', maxAge:55, effects:{ career:+8, happy:+8, smart:+8, promo:+5 } },
+    { icon:'🤝', title:'带出了好徒弟', desc:'你带的新人成长飞快，上面看在眼里。', minAge:26, effects:{ career:+6, happy:+8, promo:+5 } },
+    { icon:'☕', title:'小道消息', desc:'茶水间听到组织调整的风声，提前做了准备。', effects:{ career:+3, smart:+5, promo:+2 } },
+    { icon:'💼', title:'接了个硬仗', desc:'没人敢接的项目你接了，做成了。', minAge:24, maxAge:50, effects:{ career:+12, smart:+8, happy:-5, promo:+10 } },
+
+    // --- 企业线专属 ---
+    { icon:'🚪', title:'晋升答辩', desc:'晋升窗口开了，答辩表现不错。', track:'corporate', minAge:24, maxAge:48, effects:{ career:+8, promo:+12 } },
+    { icon:'🔄', title:'活水去了核心组', desc:'内部转岗到公司最核心的业务线。', track:'corporate', minAge:24, maxAge:45, effects:{ career:+8, smart:+5, promo:+6 } },
+    { icon:'🥊', title:'政治斗争站错队', desc:'部门斗争你站错了边，被边缘化半年。', track:'corporate', minAge:28, effects:{ career:-10, happy:-8, smart:+8, promo:-8 } },
+    { icon:'✈️', title:'外派镀金', desc:'去海外分部轮岗一年，履历+1。', track:'corporate', minAge:25, maxAge:42, effects:{ career:+10, smart:+8, happy:-5, promo:+8 } },
+
+    // --- 学术线专属 ---
+    { icon:'📄', title:'论文被顶刊接收', desc:'折磨你两年的论文终于中了顶刊！', track:'academic', effects:{ smart:+12, career:+10, happy:+10, promo:+12 } },
+    { icon:'❌', title:'论文被拒第 N 次', desc:'Reviewer 2 又双叒叕拒了你。', track:'academic', effects:{ happy:-10, smart:+5, promo:+2 } },
+    { icon:'🧪', title:'实验数据出问题', desc:'半年的实验数据发现有偏差，推倒重来。', track:'academic', effects:{ happy:-12, smart:+8 } },
+    { icon:'💰', title:'拿到国家基金', desc:'国自然面上项目获批，经费到账。', track:'academic', minAge:28, effects:{ career:+12, wealth:+8, promo:+12 } },
+    { icon:'📜', title:'收到高校聘书', desc:'一所 985 向你伸出橄榄枝。', track:'academic', minAge:28, maxAge:45, effects:{ career:+15, happy:+8, promo:+10 } },
+    { icon:'🎓', title:'学生毕业答辩全过', desc:'你带的学生全部顺利毕业，桃李满门。', track:'academic', minAge:32, effects:{ happy:+12, career:+5, promo:+5 } },
+    { icon:'🌍', title:'国际会议做报告', desc:'受邀在国际顶会做 keynote。', track:'academic', minAge:30, effects:{ career:+10, smart:+8, promo:+8 } },
+
+    // --- 体制线专属 ---
+    { icon:'📝', title:'材料写得漂亮', desc:'你写的报告被大领导批示表扬。', track:'civil', effects:{ career:+8, smart:+5, promo:+8 } },
+    { icon:'🚜', title:'下乡挂职锻炼', desc:'去基层挂职两年，晒黑了但资历厚了。', track:'civil', minAge:24, maxAge:40, effects:{ career:+10, happy:-5, smart:+8, promo:+10 } },
+    { icon:'🏅', title:'评上先进个人', desc:'年度考核优秀，获评先进个人。', track:'civil', effects:{ career:+8, happy:+5, promo:+8 } },
+    { icon:'🍵', title:'办公室泡茶哲学', desc:'和老同志学会了泡茶和说话的艺术。', track:'civil', effects:{ smart:+8, happy:+5, promo:+3 } },
+    { icon:'📋', title:'借调到上级机关', desc:'被借调到上级单位，视野开阔了。', track:'civil', minAge:26, maxAge:45, effects:{ career:+10, smart:+8, promo:+10 } },
+    { icon:'😓', title:'迎检材料写到凌晨', desc:'连续两周加班准备检查材料。', track:'civil', effects:{ happy:-8, career:+3, promo:+3 } },
+
+    // --- 创业线专属 ---
+    { icon:'💸', title:'融资谈判成功', desc:'新一轮融资敲定，账上又能撑 18 个月。', track:'startup', effects:{ career:+10, wealth:+15, happy:+8, promo:+12 } },
+    { icon:'📉', title:'资金链危机', desc:'账上只够发 2 个月工资，你抵押了车。', track:'startup', effects:{ wealth:-20, happy:-15, smart:+10, promo:+3 } },
+    { icon:'🔥', title:'产品爆了', desc:'一夜之间用户量翻了 10 倍，服务器都挂了。', track:'startup', effects:{ career:+15, wealth:+10, happy:+10, promo:+15 } },
+    { icon:'🤝', title:'挖到关键合伙人', desc:'说服了一位大牛加入，团队如虎添翼。', track:'startup', effects:{ career:+8, smart:+5, promo:+8 } },
+    { icon:'⚖️', title:'被大公司抄袭', desc:'大厂抄了你的产品，你连夜写公开信。', track:'startup', effects:{ happy:-10, career:+5, smart:+8 } },
+    { icon:'🧾', title:'合伙人散伙', desc:'理念不合，创始团队分了家。', track:'startup', effects:{ career:-10, happy:-12, smart:+10, promo:-5 } },
+
+    // --- 自由线专属 ---
+    { icon:'📹', title:'内容爆款了', desc:'一条内容全网百万播放，涨粉 10 万。', track:'freelance', effects:{ career:+12, wealth:+10, happy:+10, promo:+12 } },
+    { icon:'🤳', title:'接到品牌大单', desc:'一线品牌找你合作，报价翻了三倍。', track:'freelance', effects:{ wealth:+18, career:+8, promo:+8 } },
+    { icon:'😶', title:'流量寒冬', desc:'连续三个月数据扑街，自我怀疑中。', track:'freelance', effects:{ happy:-12, wealth:-8, smart:+8 } },
+    { icon:'📚', title:'出了一本书', desc:'把经验写成书，卖得还不错。', track:'freelance', minAge:28, effects:{ career:+10, wealth:+8, smart:+8, promo:+10 } },
   ],
+
   wealth: [
-    { icon:'📊', title:'股票赚了一笔', desc:'你在低点买入的股票涨了 30%。',
+    { icon:'📊', title:'股票赚了一笔', desc:'低点买入的股票涨了 30%。', minAge:24, effects:null,
       choices:[
         { text:'A. 落袋为安卖掉', effects:{ wealth:+15, happy:+5 } },
         { text:'B. 加仓继续持有', effects:{ wealth:+30, happy:-5, smart:-3 } }
       ]},
-    { icon:'💸', title:'股票被套', desc:'重仓的票跌了 40%。', effects:{ wealth:-20, happy:-10, smart:+5 } },
-    { icon:'🎰', title:'中奖啦', desc:'刮刮乐中了一等奖！', effects:{ wealth:+30, happy:+15 } },
-    { icon:'😱', title:'踩雷 P2P', desc:'投的 P2P 平台跑路了。', effects:{ wealth:-25, happy:-15, smart:+8 } },
-    { icon:'💰', title:'工资涨了', desc:'年度调薪普涨 15%。', effects:{ wealth:+12, happy:+8 } },
-    { icon:'📈', title:'基金定投回报', desc:'坚持定投三年，收益率 25%。', effects:{ wealth:+15, smart:+5, happy:+8 } },
-    { icon:'🍜', title:'副业开张', desc:'业余接单/写公众号有了第一笔收入。', effects:{ wealth:+10, career:+5, happy:+10 } },
-    { icon:'🏦', title:'装修贷下来了', desc:'装修花光了积蓄，压力有点大。', effects:{ wealth:-15, happy:-5 } },
-    { icon:'💳', title:'刷爆信用卡', desc:'冲动消费，账单让你崩溃。', effects:{ wealth:-12, happy:-8, smart:+3 } },
-    { icon:'🏠', title:'房租又涨了', desc:'房东通知涨 500 一个月。', effects:{ wealth:-8, happy:-8 } },
-    { icon:'💵', title:'年终奖到账', desc:'年终奖 6 个月，爽！', effects:{ wealth:+20, happy:+15 } },
-    { icon:'🚨', title:'花呗还不上了', desc:'月光族的日常，只能借下个月的钱还这个月。', effects:{ wealth:-10, happy:-10, smart:+3 } },
+    { icon:'💸', title:'股票被套', desc:'重仓的票跌了 40%。', minAge:24, effects:{ wealth:-18, happy:-10, smart:+5 } },
+    { icon:'🎰', title:'刮刮乐中奖', desc:'路边买的刮刮乐中了 5000 块！', effects:{ wealth:+8, happy:+10 } },
+    { icon:'😱', title:'理财踩雷', desc:'买的理财产品暴雷了。', minAge:26, effects:{ wealth:-20, happy:-12, smart:+8 } },
+    { icon:'💰', title:'普调 + 大红包', desc:'年度调薪普涨，还发了留任奖金。', maxAge:52, effects:{ wealth:+12, happy:+8 } },
+    { icon:'📈', title:'定投开花结果', desc:'坚持定投五年，收益率跑赢大盘。', minAge:28, effects:{ wealth:+15, smart:+5, happy:+8 } },
+    { icon:'🍜', title:'副业有起色', desc:'周末摆摊/接单，月入过万。', minAge:24, maxAge:45, effects:{ wealth:+10, happy:+8, career:-2 } },
+    { icon:'💳', title:'消费主义陷阱', desc:'双 11 冲动消费，账单让你窒息。', effects:{ wealth:-10, happy:-5, smart:+3 } },
+    { icon:'🏠', title:'房租暴涨', desc:'房东一句"市场价"，月租涨了 800。', maxAge:40, effects:{ wealth:-8, happy:-8 } },
+    { icon:'💵', title:'年终奖爆了', desc:'公司业绩好，年终奖发了 6 个月。', maxAge:52, effects:{ wealth:+20, happy:+15 } },
+    { icon:'👴', title:'帮父母理财', desc:'阻止了爸妈买"高息理财"，避免了损失。', minAge:28, effects:{ wealth:+5, smart:+8, happy:+8 } },
+    { icon:'🚗', title:'买车了', desc:'提了人生第一辆车，通勤自由。', minAge:25, maxAge:45, effects:{ wealth:-15, happy:+12 } },
+    { icon:'🪙', title:'数字货币过山车', desc:'朋友拉你买币，一周经历暴涨暴跌。', minAge:24, maxAge:40, effects:null,
+      choices:[
+        { text:'A. 及时清仓离场', effects:{ wealth:+10, smart:+8 } },
+        { text:'B. 拿住，信仰充值', effects:{ wealth:-15, happy:-8, smart:+5 } }
+      ]},
+    { icon:'🏦', title:'提前还贷', desc:'攒了一笔钱，把房贷提前还了一部分。', minAge:30, require: s => s.hasHouse, effects:{ wealth:-10, happy:+12 } },
   ],
+
   love: [
-    { icon:'💕', title:'脱单了', desc:'认识了一个不错的对象。', effects:{ happy:+15, smart:-3 } },
-    { icon:'💔', title:'分手', desc:'和对象和平分手。', effects:{ happy:-15, smart:+5 } },
-    { icon:'💌', title:'暧昧对象上线', desc:'公司来了个新同事，感觉很聊得来。', effects:{ happy:+8, career:-2 } },
-    { icon:'😭', title:'相亲失败', desc:'长辈安排的相亲，尴尬收场。', effects:{ happy:-5, smart:+3 } },
-    { icon:'👨‍👩‍👧', title:'家庭日常', desc:'和家人一起过了个温馨的假期。', effects:{ happy:+12, wealth:-3 } },
-    { icon:'💐', title:'纪念日惊喜', desc:'另一半给你准备了一个大惊喜。', effects:{ happy:+15, wealth:-3 } },
-    { icon:'😖', title:'异地恋煎熬', desc:'和对象天南海北，每次视频都很累。', effects:{ happy:-10, smart:+3 } },
-    { icon:'🥺', title:'被朋友当树洞', desc:'朋友失恋，你陪聊了一整晚。', effects:{ happy:+3, smart:+5 } },
+    { icon:'💕', title:'心动的信号', desc:'遇到一个聊得来的人，你们开始约会了。', maxAge:45, require: s => !s.married, effects:{ happy:+15, smart:-3 } },
+    { icon:'💔', title:'和平分手', desc:'走不到一起，好聚好散。', maxAge:45, require: s => !s.married, effects:{ happy:-12, smart:+5 } },
+    { icon:'😭', title:'相亲名场面', desc:'长辈安排的相亲，对方开口就问房和车。', minAge:25, maxAge:40, require: s => !s.married, effects:{ happy:-5, smart:+5 } },
+    { icon:'💍', title:'被求婚/求婚成功', desc:'水到渠成，你们决定结婚！', minAge:25, maxAge:42, require: s => !s.married, effects:{ happy:+20, wealth:-8 }, setFlag:'married' },
+    { icon:'💐', title:'纪念日惊喜', desc:'另一半偷偷准备了纪念日惊喜。', require: s => s.married, effects:{ happy:+12, wealth:-3 } },
+    { icon:'🥶', title:'婚姻冷战', desc:'因为一件小事冷战了一周。', require: s => s.married, effects:{ happy:-10, smart:+5 } },
+    { icon:'🍳', title:'家庭分工大和解', desc:'和另一半重新分了家务，世界和平。', require: s => s.married, effects:{ happy:+10 } },
+    { icon:'👶', title:'孩子的第一声爸妈', desc:'孩子开口叫人了，心都化了。', require: s => s.hasKid, effects:{ happy:+18 } },
+    { icon:'📚', title:'辅导作业崩溃', desc:'辅导孩子写作业，血压飙升。', require: s => s.hasKid, effects:{ happy:-10, smart:+3 } },
+    { icon:'🏫', title:'孩子上学了', desc:'第一天送孩子上学，门口站了很久。', require: s => s.hasKid, effects:{ happy:+10, wealth:-8 } },
+    { icon:'🏆', title:'孩子拿奖了', desc:'孩子比赛拿了奖，朋友圈晒疯了。', require: s => s.hasKid, effects:{ happy:+15 } },
+    { icon:'👵', title:'爸妈来住了一个月', desc:'爸妈来帮忙/小住，热闹也有摩擦。', minAge:28, effects:{ happy:+5, smart:+3 } },
+    { icon:'🏥', title:'父母生病', desc:'爸妈住院了，你两头跑。', minAge:32, effects:{ happy:-12, wealth:-10, smart:+5 } },
+    { icon:'🎂', title:'给爸妈过大寿', desc:'一大家子聚齐给老人过生日。', minAge:30, effects:{ happy:+12, wealth:-5 } },
   ],
+
   life: [
-    { icon:'🐱', title:'养宠物了', desc:'领养了一只猫/狗。', effects:{ happy:+15, wealth:-5 } },
-    { icon:'🏃', title:'开始健身', desc:'办了健身卡开始规律运动。', effects:{ happy:+10, smart:+5, wealth:-3 } },
-    { icon:'😷', title:'生病住院', desc:'一场大病，住了半个月院。', effects:{ happy:-15, wealth:-15, smart:+5 } },
-    { icon:'🎨', title:'培养了新爱好', desc:'开始学画画/摄影/乐器。', effects:{ happy:+12, smart:+8, wealth:-5 } },
-    { icon:'🏠', title:'搬家了', desc:'换了个更喜欢的房子/城市。', effects:{ happy:+10, wealth:-8 } },
-    { icon:'🍺', title:'和朋友聚会', desc:'一群老朋友周末聚了聚。', effects:{ happy:+8, wealth:-3 } },
-    { icon:'🥱', title:'长期熬夜', desc:'连续加班熬夜，身体亮红灯。', effects:{ happy:-8, smart:-5, career:+3 } },
-    { icon:'🚇', title:'通勤 2 小时', desc:'新房子太远，每天路上就 4 小时。', effects:{ happy:-12, smart:+3 } },
-    { icon:'🎢', title:'和朋友周末出游', desc:'去了郊外，感觉整个人被治愈。', effects:{ happy:+15, wealth:-8 } },
-    { icon:'🍔', title:'点外卖点到腻', desc:'连续两周点外卖，胖了 5 斤。', effects:{ happy:-3, wealth:-5 } },
-    { icon:'🌿', title:'养绿植回血', desc:'工位放了几盆绿植，心情好多了。', effects:{ happy:+5, smart:+3 } },
+    { icon:'🐱', title:'撸猫/撸狗自由', desc:'领养了一只毛孩子。', effects:{ happy:+15, wealth:-5 } },
+    { icon:'🏃', title:'跑了人生第一个半马', desc:'坚持训练三个月，完赛了！', maxAge:55, effects:{ happy:+12, smart:+5, wealth:-3 } },
+    { icon:'😷', title:'身体亮红灯', desc:'体检报告好几个箭头，医生让你注意。', minAge:28, effects:{ happy:-10, wealth:-8, smart:+5 } },
+    { icon:'🎨', title:'解锁新爱好', desc:'开始学画画/摄影/乐器，生活有了盼头。', effects:{ happy:+12, smart:+8, wealth:-5 } },
+    { icon:'🏠', title:'搬进心仪的房子', desc:'换了个采光好的房子，幸福感暴涨。', effects:{ happy:+10, wealth:-8 } },
+    { icon:'🍺', title:'老友重聚', desc:'大学室友聚齐了，聊到凌晨三点。', effects:{ happy:+10, wealth:-3 } },
+    { icon:'🥱', title:'报复性熬夜', desc:'白天属于工作，只有深夜属于自己。', maxAge:45, effects:{ happy:-5, smart:-5, career:+3 } },
+    { icon:'🚇', title:'通勤地狱', desc:'单程通勤 2 小时，人在工位魂在地铁。', maxAge:45, effects:{ happy:-10, smart:+3 } },
+    { icon:'🎢', title:'来一场说走就走的旅行', desc:'请了年假去看海，整个人被治愈。', effects:{ happy:+15, wealth:-8 } },
+    { icon:'🍔', title:'外卖依赖症', desc:'连续一个月外卖，胖了 5 斤。', effects:{ happy:-3, wealth:-5 } },
+    { icon:'🌿', title:'工位绿植计划', desc:'工位变成小花园，心情都好了。', effects:{ happy:+5, smart:+3 } },
+    { icon:'🧘', title:'开始冥想', desc:'每天 10 分钟冥想，焦虑少了很多。', minAge:28, effects:{ happy:+10, smart:+5 } },
+    { icon:'🏊', title:'学会了游泳', desc:'30 多岁学会游泳，谁说晚了？', minAge:28, effects:{ happy:+8, smart:+3 } },
+    { icon:'🛋️', title:'宅家的一年', desc:'这一年几乎没出门社交，省钱但有点闷。', effects:{ wealth:+8, happy:-5 } },
   ],
+
   study: [
-    { icon:'📚', title:'考证成功', desc:'花了半年考的证终于拿到了。', effects:{ smart:+15, career:+8, happy:+5 } },
-    { icon:'🧠', title:'看了一本好书', desc:'一本改变认知的书。', effects:{ smart:+8, happy:+5 } },
-    { icon:'💻', title:'学了新技能', desc:'掌握了新工具/新语言/新方法。', effects:{ smart:+10, career:+8 } },
-    { icon:'🎤', title:'参加行业大会', desc:'去了一场行业峰会，认识了不少同行。', effects:{ smart:+8, career:+10, wealth:-3 } },
-    { icon:'📖', title:'夜校打卡', desc:'报了个夜校，学得很起劲。', effects:{ smart:+12, wealth:-5, happy:+3 } },
-    { icon:'❌', title:'考证挂了', desc:'考了三次，还是没过。', effects:{ smart:+5, happy:-8, wealth:-3 } },
+    { icon:'📚', title:'考证上岸', desc:'备考半年的证书拿下了。', maxAge:50, effects:{ smart:+12, career:+8, happy:+5, promo:+5 } },
+    { icon:'🧠', title:'一本书改变认知', desc:'读到一本颠覆认知的书。', effects:{ smart:+8, happy:+5 } },
+    { icon:'💻', title:'学会了 AI 工具', desc:'掌握了新的 AI 工具，效率翻倍。', effects:{ smart:+10, career:+8, promo:+5 } },
+    { icon:'🗣️', title:'外语突破', desc:'坚持学外语两年，能流利对话了。', effects:{ smart:+10, career:+5 } },
+    { icon:'📖', title:'夜校新青年', desc:'报了夜校，认识了一群有趣的人。', maxAge:45, effects:{ smart:+10, happy:+5, wealth:-3 } },
+    { icon:'❌', title:'考试连挂', desc:'考了三次还是没过，怀疑人生。', effects:{ smart:+5, happy:-8, wealth:-3 } },
+    { icon:'🎙️', title:'开始做播客', desc:'和朋友做了档播客，小有听众。', minAge:25, maxAge:45, effects:{ smart:+8, happy:+8, career:+3 } },
+    { icon:'✍️', title:'坚持写作一年', desc:'公众号/博客写了一年，思维清晰了很多。', effects:{ smart:+10, career:+5, promo:+3 } },
   ],
+
   social: [
-    { icon:'🤝', title:'认识了贵人', desc:'一个前辈愿意带你成长。', effects:{ career:+15, smart:+8, happy:+8 } },
-    { icon:'🎭', title:'被朋友借钱', desc:'多年的朋友张口借 5 万。',
+    { icon:'🤝', title:'遇到人生导师', desc:'一位前辈真心带你，倾囊相授。', maxAge:45, effects:{ career:+12, smart:+8, happy:+8, promo:+8 } },
+    { icon:'🎭', title:'朋友开口借钱', desc:'多年好友张口借 5 万。', minAge:25, effects:null,
       choices:[
-        { text:'A. 借了', effects:{ wealth:-10, happy:+3 } },
-        { text:'B. 委婉拒绝', effects:{ wealth:0, happy:-5, smart:+5 } }
+        { text:'A. 借了，朋友要紧', effects:{ wealth:-10, happy:+3 } },
+        { text:'B. 委婉拒绝', effects:{ happy:-5, smart:+5 } }
       ]},
-    { icon:'👥', title:'加入了新社群', desc:'找到了志同道合的小圈子。', effects:{ happy:+10, smart:+5 } },
-    { icon:'😠', title:'和老友闹掰了', desc:'和多年好友因为一件小事翻脸。', effects:{ happy:-12, smart:+5 } },
-    { icon:'🎉', title:'当伴郎/伴娘', desc:'参加了朋友的婚礼，还上台了。', effects:{ happy:+10, wealth:-5 } },
-    { icon:'🎁', title:'意外收到礼物', desc:'朋友从外地给你寄了礼物。', effects:{ happy:+8 } },
-    { icon:'🍻', title:'组内团建', desc:'组内一起 K 歌，被逼唱了 3 首。', effects:{ happy:+5, career:+3, wealth:-3 } },
+    { icon:'👥', title:'找到同频圈子', desc:'加入一个宝藏社群，周末有了去处。', effects:{ happy:+10, smart:+5 } },
+    { icon:'😠', title:'多年好友闹掰', desc:'因为一件小事，和老友渐行渐远。', effects:{ happy:-12, smart:+5 } },
+    { icon:'🎉', title:'婚礼上的伴郎/伴娘', desc:'给最好的朋友当伴郎/伴娘。', minAge:25, maxAge:38, effects:{ happy:+10, wealth:-5 } },
+    { icon:'🍻', title:'团建 K 歌', desc:'被逼着唱了 3 首，意外获得好评。', maxAge:45, effects:{ happy:+5, career:+3 } },
+    { icon:'🧧', title:'份子钱刺客', desc:'一个月三场婚礼，钱包被掏空。', minAge:26, maxAge:38, effects:{ wealth:-8, happy:-3 } },
+    { icon:'🌉', title:'贵人引荐', desc:'朋友把你引荐给了行业大佬。', minAge:26, effects:{ career:+10, smart:+5, promo:+6 } },
+    { icon:'🤗', title:'帮了别人一个大忙', desc:'顺手帮的忙，对方记了很多年。', effects:{ happy:+8, smart:+3 } },
   ],
+
   mystery: [
-    { icon:'👽', title:'路遇算命先生', desc:'一位老人告诉你会有大运，你信吗？',
+    { icon:'🔮', title:'街头算命', desc:'算命先生说你印堂发亮，近期有大运。', effects:null,
       choices:[
-        { text:'A. 信，按他说的去做', effects:{ happy:+8, wealth:+15, smart:-5 } },
-        { text:'B. 不信，一笑而过', effects:{ smart:+8, happy:-2 } }
+        { text:'A. 信他一回', effects:{ happy:+8, wealth:+10, smart:-5 } },
+        { text:'B. 一笑而过', effects:{ smart:+8 } }
       ]},
-    { icon:'🎁', title:'意外之财', desc:'一个多年不联系的亲戚给了你一笔钱。', effects:{ wealth:+20, happy:+8 } },
-    { icon:'🚨', title:'意外事故', desc:'被电动车撞了，还好没大事。', effects:{ wealth:+8, happy:-8, smart:+3 } },
-    { icon:'🎬', title:'上了热搜', desc:'一件小事让你意外走红网络。',
+    { icon:'🎁', title:'远房亲戚的馈赠', desc:'多年不联系的亲戚留了一笔遗产给你。', minAge:30, effects:{ wealth:+20, happy:+5 } },
+    { icon:'🚗', title:'小事故有惊无险', desc:'被电动车剐了一下，对方全责赔付。', effects:{ wealth:+5, happy:-5 } },
+    { icon:'📺', title:'意外上了热搜', desc:'随手拍的视频火了，上了同城热搜。', maxAge:50, effects:null,
       choices:[
-        { text:'A. 借势做自媒体', effects:{ wealth:+20, career:+10, happy:-5 } },
-        { text:'B. 低调删博，回归生活', effects:{ happy:+10, smart:+5 } }
+        { text:'A. 趁热做自媒体', effects:{ wealth:+15, career:+8, happy:-5 } },
+        { text:'B. 低调删掉回归生活', effects:{ happy:+10, smart:+5 } }
       ]},
-    { icon:'🧙', title:'神秘任务', desc:'一封匿名邮件邀请你做一件"很重要"的事。',
-      choices:[
-        { text:'A. 接受挑战', effects:{ smart:+15, happy:+10, wealth:+10 } },
-        { text:'B. 直接拉黑', effects:{ smart:+5 } }
-      ]},
-    { icon:'🐉', title:'家里长辈托梦', desc:'梦到已故长辈，醒来若有所思。', effects:{ smart:+10, happy:+5 } },
-    { icon:'🍀', title:'捡到 100 块', desc:'路上捡到 100 块，运气爆棚。', effects:{ wealth:+3, happy:+5 } },
+    { icon:'🍀', title:'欧气爆棚的一天', desc:'抽奖中了最新款手机。', effects:{ wealth:+8, happy:+10 } },
+    { icon:'🕳️', title:'钱包丢了', desc:'钱包证件全丢，补办跑断腿。', effects:{ wealth:-5, happy:-8 } },
+    { icon:'💌', title:'收到十年前的信', desc:'大学时写给未来自己的信寄到了。', minAge:30, effects:{ happy:+12, smart:+5 } },
+    { icon:'🎬', title:'当了回群众演员', desc:'剧组来取景，你混了个镜头。', effects:{ happy:+8 } },
+    { icon:'🛸', title:'彻夜看了场流星雨', desc:'和重要的人一起看了流星雨。', effects:{ happy:+12 } },
   ],
 };
 
-// ===== 人生岔路（每 3 轮触发一次）=====
-// 玩家必须主动做选择的重大节点
+// ===== 人生岔路 =====
+// minAge/maxAge 控制出现窗口；require 状态门槛；choice 可 setFlag
 const CROSSROADS = [
   {
-    id:'crossroad_job1',
-    icon:'🔀',
-    title:'职业岔路口',
-    desc:'工作 3 年了，行业也在变。要不要动一动？',
+    id:'cr_love', icon:'💘', title:'谈婚论嫁', minAge:24, maxAge:38,
+    require: s => !s.married,
+    desc:'感情稳定了，双方父母也见过了。要不要结婚？',
     choices:[
-      { text:'A. 跳槽到心仪的新公司（薪资 +50%，但要重新适应）', effects:{ career:+8, wealth:+20, happy:-10, smart:+5 } },
-      { text:'B. 内部转岗，换个方向试试', effects:{ career:+5, wealth:+3, happy:+5, smart:+10 } },
-      { text:'C. 原地不动，深耕专业', effects:{ career:+10, wealth:+5, happy:+8, smart:+8 } },
+      { text:'A. 结婚，办一场婚礼', effects:{ wealth:-20, happy:+20 }, setFlag:'married' },
+      { text:'B. 领证旅行结婚，不办酒', effects:{ wealth:-5, happy:+15 }, setFlag:'married' },
+      { text:'C. 再等等，事业为重', effects:{ career:+5, happy:-5 } },
     ]
   },
   {
-    id:'crossroad_study',
-    icon:'🎓',
-    title:'要不要读研/进修',
-    desc:'一个进修的机会摆在面前，纠结中……',
+    id:'cr_baby', icon:'👶', title:'生娃计划', minAge:26, maxAge:38,
+    require: s => s.married && !s.hasKid,
+    desc:'双方老人开始催了，你们自己也在犹豫……',
     choices:[
-      { text:'A. 辞职读全日制研究生', effects:{ career:-5, wealth:-25, smart:+30, happy:-3 } },
-      { text:'B. 报个在职 MBA', effects:{ career:+5, wealth:-15, smart:+18, happy:-5 } },
-      { text:'C. 不进修，继续工作', effects:{ career:+3, wealth:+3, happy:+5 } },
+      { text:'A. 要一个孩子', effects:{ wealth:-15, happy:+15, career:-5 }, setFlag:'hasKid' },
+      { text:'B. 要俩，凑个"好"字', effects:{ wealth:-30, happy:+22, career:-12 }, setFlag:'hasKid' },
+      { text:'C. 丁克，二人世界挺好', effects:{ wealth:+8, happy:+5 } },
     ]
   },
   {
-    id:'crossroad_marry',
-    icon:'💍',
-    title:'感情大事',
-    desc:'和对象在一起 3 年了，要不要走下一步？',
+    id:'cr_house', icon:'🏠', title:'买房抉择', minAge:26, maxAge:42,
+    require: s => !s.hasHouse,
+    desc:'攒了些首付，父母也愿意支持一点。上不上车？',
     choices:[
-      { text:'A. 结婚，办个婚礼', effects:{ wealth:-25, happy:+20, career:-3 } },
-      { text:'B. 领证就好，不办婚礼', effects:{ wealth:-3, happy:+15 } },
-      { text:'C. 再等等，不着急', effects:{ happy:-3, smart:+3 } },
+      { text:'A. 大城市咬牙上车', effects:{ wealth:-30, happy:-5, career:+5 }, setFlag:'hasHouse' },
+      { text:'B. 老家买房，大城市租房', effects:{ wealth:-12, happy:+5 }, setFlag:'hasHouse' },
+      { text:'C. 不买，钱拿去投资自己', effects:{ wealth:+5, smart:+8, happy:+3 } },
     ]
   },
   {
-    id:'crossroad_baby',
-    icon:'👶',
-    title:'要不要生娃',
-    desc:'和另一半讨论生娃计划。',
+    id:'cr_jobhop', icon:'🔀', title:'职业岔路口', minAge:25, maxAge:42,
+    require: s => s.track === 'corporate',
+    desc:'一个新机会摆在面前，薪资涨 50%，但全部推倒重来。',
     choices:[
-      { text:'A. 生一个', effects:{ wealth:-20, happy:+18, career:-8, smart:+5 } },
-      { text:'B. 生两个', effects:{ wealth:-35, happy:+25, career:-15, smart:+5 } },
-      { text:'C. 丁克到底', effects:{ wealth:+10, happy:+5, career:+3 } },
+      { text:'A. 跳！趁年轻搏一把', effects:{ career:+8, wealth:+18, happy:-8, promo:+5 } },
+      { text:'B. 用 offer 找老板谈加薪', effects:{ wealth:+10, career:+3, smart:+5 } },
+      { text:'C. 不动，稳扎稳打', effects:{ career:+5, happy:+5, promo:+3 } },
     ]
   },
   {
-    id:'crossroad_house',
-    icon:'🏠',
-    title:'买房问题',
-    desc:'父母催着买房，房价也在动。',
+    id:'cr_mba', icon:'🎓', title:'充电还是赚钱', minAge:27, maxAge:40,
+    require: s => s.track !== 'academic',
+    desc:'工作几年遇到瓶颈，要不要回炉深造？',
     choices:[
-      { text:'A. 咬牙上车，30 年房贷', effects:{ wealth:-30, happy:-8, career:+8 } },
-      { text:'B. 老家买房，一线租房', effects:{ wealth:-15, happy:+5 } },
-      { text:'C. 坚持租房，保持自由', effects:{ wealth:+8, happy:+8 } },
+      { text:'A. 脱产读研，彻底充电', effects:{ career:-5, wealth:-20, smart:+25 } },
+      { text:'B. 在职读个 MBA', effects:{ wealth:-15, smart:+15, career:+5, promo:+5 } },
+      { text:'C. 不读，实战里学', effects:{ career:+5, smart:+5, promo:+3 } },
     ]
   },
   {
-    id:'crossroad_startup',
-    icon:'🚀',
-    title:'创业机会',
-    desc:'前同事拉你合伙创业，方向是你熟悉的领域。',
+    id:'cr_phd_stay', icon:'🔬', title:'学术还是工业界', minAge:26, maxAge:36,
+    require: s => s.track === 'academic',
+    desc:'博士快毕业了，是留在学术圈还是去企业？',
     choices:[
-      { text:'A. 全职 all in', effects:{ career:+15, wealth:-25, happy:-5, smart:+15 } },
-      { text:'B. 兼职参与，只投小钱', effects:{ career:+5, wealth:-8, happy:+3, smart:+8 } },
-      { text:'C. 拒绝，稳定第一', effects:{ career:+3, wealth:+5, happy:+5 } },
+      { text:'A. 留校做博后，冲教职', effects:{ smart:+15, wealth:-10, promo:+10 } },
+      { text:'B. 去大厂研究院，名利双收', effects:{ wealth:+20, career:+10, smart:+5 } },
+      { text:'C. 创业，把论文变产品', effects:{ career:+10, wealth:-10, smart:+10 } },
     ]
   },
   {
-    id:'crossroad_midcrisis',
-    icon:'😰',
-    title:'35 岁危机',
-    desc:'公司大规模裁员，你在名单边缘。',
+    id:'cr_civil_choice', icon:'🏛️', title:'仕途选择', minAge:28, maxAge:45,
+    require: s => s.track === 'civil',
+    desc:'组织找你谈话：有一个去艰苦地区任职的机会，锻炼两年。',
     choices:[
-      { text:'A. 主动谈 N+3 走人，休整一段', effects:{ career:-15, wealth:+15, happy:+15, smart:+8 } },
-      { text:'B. 卷起来求生存，加班表现', effects:{ career:+8, wealth:+3, happy:-15, smart:0 } },
-      { text:'C. 借机转行/考公', effects:{ career:-8, wealth:-5, happy:+10, smart:+15 } },
+      { text:'A. 去，服从组织安排', effects:{ career:+12, happy:-8, smart:+10, promo:+15 } },
+      { text:'B. 婉拒，家里离不开', effects:{ happy:+5, promo:-5 } },
+      { text:'C. 申请去对口交流单位', effects:{ career:+5, smart:+5, promo:+5 } },
     ]
   },
   {
-    id:'crossroad_lifegoal',
-    icon:'✈️',
-    title:'人生小转弯',
-    desc:'厌倦了当前的生活节奏，想改变。',
+    id:'cr_startup_exit', icon:'💰', title:'卖还是不卖', minAge:28, maxAge:50,
+    require: s => s.track === 'startup',
+    desc:'巨头开价收购你的公司，价格不错，但品牌会消失。',
     choices:[
-      { text:'A. 裸辞环游世界一年', effects:{ career:-20, wealth:-25, happy:+30, smart:+15 } },
-      { text:'B. 换个城市生活', effects:{ career:-5, wealth:-10, happy:+15 } },
-      { text:'C. 保持现状，忍忍就过了', effects:{ happy:-8, smart:+3 } },
+      { text:'A. 卖！落袋为安', effects:{ wealth:+35, happy:+10, career:-5 } },
+      { text:'B. 拒绝，独立走到上市', effects:{ career:+15, happy:-8, promo:+15 } },
+      { text:'C. 卖一部分，保留控制权', effects:{ wealth:+15, career:+5, promo:+5 } },
+    ]
+  },
+  {
+    id:'cr_midlife', icon:'😰', title:'中年危机', minAge:35, maxAge:48,
+    desc:'行业动荡，身边同龄人接连"毕业"。你开始睡不好了。',
+    choices:[
+      { text:'A. 主动求变，转型新赛道', effects:{ career:-5, smart:+15, happy:+5, promo:+5 } },
+      { text:'B. 深耕不动，做到不可替代', effects:{ career:+10, smart:+8, happy:-5, promo:+8 } },
+      { text:'C. 降低欲望，主动降档', effects:{ wealth:-10, happy:+15 } },
+    ]
+  },
+  {
+    id:'cr_health', icon:'🏥', title:'健康警报', minAge:35,
+    desc:'体检查出问题，医生严肃地跟你谈了一次。',
+    choices:[
+      { text:'A. 彻底改变生活方式', effects:{ happy:+10, career:-3, smart:+5 } },
+      { text:'B. 吃药控制，工作照旧', effects:{ career:+3, happy:-8 } },
+      { text:'C. 请长假好好休养', effects:{ career:-8, happy:+15, wealth:-8 } },
+    ]
+  },
+  {
+    id:'cr_parents', icon:'👵', title:'父母养老', minAge:38,
+    desc:'父母年纪大了，身体一年不如一年，养老怎么安排？',
+    choices:[
+      { text:'A. 接来同住，亲自照顾', effects:{ happy:+8, wealth:-8, career:-5 } },
+      { text:'B. 请护工/选好的养老社区', effects:{ wealth:-18, happy:+3 } },
+      { text:'C. 回老家发展，守在身边', effects:{ career:-12, happy:+12, wealth:-5 } },
+    ]
+  },
+  {
+    id:'cr_lifegoal', icon:'✈️', title:'人生下半场', minAge:40,
+    desc:'前半生一直在赶路。停下来想想，后面的路怎么走？',
+    choices:[
+      { text:'A. 继续冲，事业还没到顶', effects:{ career:+10, happy:-5, promo:+8 } },
+      { text:'B. 半退休，把时间留给家人', effects:{ career:-8, happy:+18 } },
+      { text:'C. 做点想做没做的事', effects:{ happy:+12, smart:+10, wealth:-8 } },
+    ]
+  },
+  {
+    id:'cr_kid_edu', icon:'🏫', title:'孩子教育', minAge:32, maxAge:48,
+    require: s => s.hasKid,
+    desc:'孩子该上学了，教育路线怎么选？',
+    choices:[
+      { text:'A. 卷起来：学区房+补习班', effects:{ wealth:-25, happy:-8, career:-3 } },
+      { text:'B. 快乐教育，顺其自然', effects:{ happy:+10, wealth:-5 } },
+      { text:'C. 自己上手当"家庭教师"', effects:{ smart:+8, happy:-5, career:-5 } },
+    ]
+  },
+  {
+    id:'cr_sidegig', icon:'🌙', title:'副业的诱惑', minAge:26, maxAge:45,
+    require: s => s.track === 'corporate' || s.track === 'civil',
+    desc:'朋友的项目做起来了，想拉你入伙做副业，有搞头但费精力。',
+    choices:[
+      { text:'A. 加入，睡后收入香', effects:{ wealth:+15, happy:-8, career:-3 } },
+      { text:'B. 只投钱不投时间', effects:{ wealth:+5, smart:+3 } },
+      { text:'C. 拒绝，主业要紧', effects:{ career:+5, promo:+5 } },
     ]
   },
 ];
@@ -1038,7 +1241,7 @@ const CROSSROADS = [
 const WHEEL_SECTORS = [
   { key:'career', label:'职场',  color:'#29adff', icon:'💼' },
   { key:'wealth', label:'财富',  color:'#ffec27', icon:'💰' },
-  { key:'love',   label:'感情',  color:'#ff77a8', icon:'❤️' },
+  { key:'love',   label:'家庭',  color:'#ff77a8', icon:'❤️' },
   { key:'life',   label:'生活',  color:'#00e436', icon:'🏠' },
   { key:'study',  label:'学习',  color:'#7e2553', icon:'📚' },
   { key:'social', label:'社交',  color:'#ff8b3d', icon:'🤝' },
@@ -1052,11 +1255,11 @@ const ENDINGS = [
   { minWealth: 85, tag:'财富自由', desc:'钱不再是问题，真正实现了想干嘛就干嘛的自由。' },
   { minHappy:  85, tag:'幸福赢家', desc:'家人朋友环绕，日子过得舒心自在。什么叫圆满？你就是。' },
   { minSmart:  85, tag:'智慧长者', desc:'读万卷书，行万里路。你成了别人眼中通透智慧的长辈。' },
-  { total: 300,    tag:'人生赢家', desc:'四维均衡发展，事业有成、家庭美满、财务健康、心态平和。羡慕的目光留给别人。' },
-  { total: 240,    tag:'佛系人生', desc:'不争不抢，随遇而安。日子平淡但也算过得去，60 岁开始享受慢生活。' },
-  { total: 180,    tag:'普通打工人', desc:'和大多数人一样，起起伏伏走完这一生。虽然没什么波澜壮阔，但也算完整。' },
-  { total: 120,    tag:'跌宕人生', desc:'一路坎坷，起起落落。回头看，有遗憾但也有回味。' },
-  { total: 0,      tag:'黯淡收场', desc:'年少的锋芒被岁月磨平，60 岁的你有些疲惫。也许下辈子重来会更好？' },
+  { total: 300,    tag:'人生赢家', desc:'四维均衡发展，事业有成、家庭美满、财务健康、心态平和。' },
+  { total: 240,    tag:'佛系人生', desc:'不争不抢，随遇而安。日子平淡但也算过得去。' },
+  { total: 180,    tag:'普通打工人', desc:'和大多数人一样，起起伏伏走完这一生，但也算完整。' },
+  { total: 120,    tag:'跌宕人生', desc:'一路坎坷，起起落落。有遗憾但也有回味。' },
+  { total: 0,      tag:'黯淡收场', desc:'年少的锋芒被岁月磨平。也许下辈子重来会更好？' },
 ];
 
 // ===== 状态 =====
@@ -1069,8 +1272,17 @@ const state = {
   maxTurns: 13,
   isSpinning: false,
   usedCrossroads: [],
-  gradPath: null,     // 毕业路径 key
-  gradSubPath: null,  // 就业子路径
+  gradPath: null,
+  gradSubPath: null,
+  // v3 新增
+  track: 'corporate',   // 晋升线
+  promoRate: 1.0,       // 晋升速度系数
+  promo: 0,             // 累计晋升点数
+  level: 0,             // 当前级别 idx
+  married: false,
+  hasKid: false,
+  hasHouse: false,
+  peakLevel: 0,
 };
 
 const START_BONUS = {
@@ -1111,9 +1323,7 @@ function drawWheel() {
     ctx.translate(cx, cy);
     const midAngle = start + anglePer / 2;
     const textR = r * 0.68;
-    const tx = Math.cos(midAngle) * textR;
-    const ty = Math.sin(midAngle) * textR;
-    ctx.translate(tx, ty);
+    ctx.translate(Math.cos(midAngle) * textR, Math.sin(midAngle) * textR);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#111';
@@ -1133,7 +1343,6 @@ function drawWheel() {
 
 // ===== 初始化 =====
 $('goGradBtn').addEventListener('click', gotoGraduate);
-$('startBtn').addEventListener('click', startGame);
 
 function gotoGraduate() {
   const name = $('playerName').value.trim();
@@ -1152,7 +1361,7 @@ function gotoGraduate() {
   renderGraduate();
 }
 
-// ===== 毕业选择渲染 =====
+// ===== 毕业选择 =====
 function renderGraduate() {
   const box = $('gradOptions');
   box.innerHTML = '';
@@ -1182,10 +1391,10 @@ function onGraduatePick(pathKey) {
   if (path.hasSubChoice) {
     renderGraduateSub(path);
   } else {
-    // 直接应用效果
+    state.track = path.track || 'corporate';
     if (path.effects) applyStat(path.effects);
     if (path.ageBonus) state.age += path.ageBonus;
-    state.history.push({ age: state.age, icon: path.icon, text: `毕业选择：${path.label} · ${path.desc}` });
+    state.history.push({ age: state.age, icon: path.icon, text: `毕业选择：${path.label}` });
     startGame(path);
   }
 }
@@ -1206,6 +1415,8 @@ function renderGraduateSub(path) {
     `;
     card.addEventListener('click', () => {
       state.gradSubPath = sub.id;
+      state.track = sub.track || path.track || 'corporate';
+      state.promoRate = sub.promoRate || 1.0;
       applyStat(sub.effects);
       state.history.push({ age: state.age, icon: sub.icon, text: `毕业选择：${path.label} · ${sub.label}` });
       startGame(path, sub);
@@ -1216,9 +1427,49 @@ function renderGraduateSub(path) {
 
 function applyStat(effects) {
   Object.entries(effects || {}).forEach(([k,v]) => {
-    if (k === 'age') return;
-    state[k] = Math.max(0, Math.min(100, state[k] + v));
+    if (k === 'age' || k === 'promo') return;
+    if (['career','wealth','happy','smart'].includes(k)) {
+      state[k] = Math.max(0, Math.min(100, state[k] + v));
+    }
   });
+  // 晋升点数
+  if (effects && effects.promo) {
+    state.promo += Math.round(effects.promo * state.promoRate);
+    if (state.promo < 0) state.promo = 0;
+    checkPromotion();
+  }
+}
+
+// ===== 晋升检查 =====
+function checkPromotion() {
+  const track = CAREER_TRACKS[state.track];
+  if (!track) return;
+  let newLevel = state.level;
+  while (newLevel + 1 < track.levels.length && state.promo >= track.promoNeed[newLevel + 1]) {
+    newLevel++;
+  }
+  if (newLevel > state.level) {
+    for (let l = state.level + 1; l <= newLevel; l++) {
+      const bonus = track.levelBonus[l] || {};
+      Object.entries(bonus).forEach(([k,v]) => {
+        if (['career','wealth','happy','smart'].includes(k)) {
+          state[k] = Math.max(0, Math.min(100, state[k] + v));
+        }
+      });
+      state.history.push({ age: state.age, icon: '🎉', text: `晋升为「${track.levels[l]}」！`, isPromo: true });
+    }
+    state.level = newLevel;
+    state.peakLevel = Math.max(state.peakLevel, newLevel);
+    updateLevelDisplay();
+    renderHistory();
+  }
+}
+
+function updateLevelDisplay() {
+  const track = CAREER_TRACKS[state.track];
+  if (track && $('displayLevel')) {
+    $('displayLevel').textContent = track.levels[state.level];
+  }
 }
 
 // ===== 进入游戏 =====
@@ -1228,6 +1479,7 @@ function startGame(gradPath, gradSub) {
   $('displayName').textContent = state.name;
   const pathLabel = gradSub ? `${gradPath.label}·${gradSub.label}` : (gradPath ? gradPath.label : '');
   $('displayPath').textContent = pathLabel;
+  updateLevelDisplay();
   drawWheel();
   updateDisplay();
 }
@@ -1244,6 +1496,7 @@ function updateDisplay() {
     else if (val >= 40) fill.style.background = 'var(--pixel-yellow)';
     else fill.style.background = 'var(--pixel-red)';
   });
+  updateLevelDisplay();
 }
 function cap(s) { return s[0].toUpperCase() + s.slice(1); }
 
@@ -1271,21 +1524,15 @@ function spin() {
 }
 
 function getSectorWeights() {
-  // 根据毕业路径调整权重
   const base = WHEEL_SECTORS.map(() => 1);
-  const pathBoost = {
-    'employ_bigtech':  { career: 1.5, wealth: 1.3 },
-    'employ_midtech':  { career: 1.2, life: 1.2 },
-    'employ_foreign':  { life: 1.5, love: 1.3 },
-    'employ_stateown': { life: 1.4, social: 1.3 },
-    'employ_startup':  { mystery: 1.6, career: 1.3, wealth: 1.2 },
-    'employ_freelance':{ mystery: 1.4, life: 1.3, study: 1.3 },
-    'study':   { study: 1.6, mystery: 1.2 },
-    'gaokao':  { life: 1.4, social: 1.3, love: 1.2 },
-    'gapyear': { mystery: 1.5, life: 1.3, love: 1.2 },
+  const trackBoost = {
+    corporate: { career: 1.3 },
+    academic:  { study: 1.5, career: 1.2 },
+    civil:     { social: 1.3, life: 1.2, career: 1.2 },
+    startup:   { career: 1.4, mystery: 1.3, wealth: 1.2 },
+    freelance: { mystery: 1.3, life: 1.2, study: 1.2 },
   };
-  const key = state.gradSubPath ? `${state.gradPath}_${state.gradSubPath}` : state.gradPath;
-  const boost = pathBoost[key] || {};
+  const boost = trackBoost[state.track] || {};
   WHEEL_SECTORS.forEach((sec, i) => {
     if (boost[sec.key]) base[i] *= boost[sec.key];
   });
@@ -1302,19 +1549,35 @@ function weightedPick(weights) {
   return weights.length - 1;
 }
 
+// ===== 事件筛选（年龄窗口 + 状态门槛 + 晋升线）=====
+function eligibleEvents(pool) {
+  return pool.filter(ev => {
+    if (ev.minAge && state.age < ev.minAge) return false;
+    if (ev.maxAge && state.age > ev.maxAge) return false;
+    if (ev.track && ev.track !== state.track) return false;
+    if (ev.require && !ev.require(state)) return false;
+    return true;
+  });
+}
+
 // ===== 触发事件 =====
 function triggerEvent(categoryKey, categoryLabel) {
-  const pool = EVENTS[categoryKey];
+  let pool = eligibleEvents(EVENTS[categoryKey]);
+  if (pool.length === 0) pool = eligibleEvents(EVENTS.life); // 兜底
+  if (pool.length === 0) pool = EVENTS.life;
   const ev = pool[Math.floor(Math.random() * pool.length)];
 
   showEventModal({
     icon: ev.icon, category: categoryLabel, title: ev.title, desc: ev.desc,
-    effects: ev.effects, choices: ev.choices,
-    onDone: (choiceText, effects) => finishEvent(ev, choiceText, effects, false)
+    effects: ev.effects, choices: ev.choices, setFlag: ev.setFlag,
+    onDone: (choiceText, effects, flag) => {
+      if (flag) state[flag] = true;
+      finishEvent(ev, choiceText, effects, false);
+    }
   });
 }
 
-function showEventModal({ icon, category, title, desc, effects, choices, onDone, isCrossroad }) {
+function showEventModal({ icon, category, title, desc, effects, choices, setFlag, onDone, isCrossroad }) {
   $('eventIcon').textContent = icon;
   $('eventCategory').textContent = (isCrossroad ? '🔀 人生岔路 · ' : '') + category.toUpperCase();
   $('eventTitle').textContent = title;
@@ -1334,7 +1597,6 @@ function showEventModal({ icon, category, title, desc, effects, choices, onDone,
       btn.className = 'choice-btn';
       btn.textContent = ch.text;
       btn.onclick = () => {
-        // 显示效果，再等用户点"继续"
         effectsBox.innerHTML = '';
         renderEffects(ch.effects, effectsBox);
         choicesBox.innerHTML = '';
@@ -1343,7 +1605,7 @@ function showEventModal({ icon, category, title, desc, effects, choices, onDone,
         next.textContent = '继续人生 →';
         next.onclick = () => {
           $('eventModal').classList.remove('active');
-          onDone(ch.text, ch.effects);
+          onDone(ch.text, ch.effects, ch.setFlag);
         };
         choicesBox.appendChild(next);
       };
@@ -1356,7 +1618,7 @@ function showEventModal({ icon, category, title, desc, effects, choices, onDone,
     btn.textContent = '继续人生 →';
     btn.onclick = () => {
       $('eventModal').classList.remove('active');
-      onDone(null, effects);
+      onDone(null, effects, setFlag);
     };
     choicesBox.appendChild(btn);
   }
@@ -1365,9 +1627,10 @@ function showEventModal({ icon, category, title, desc, effects, choices, onDone,
 }
 
 function renderEffects(effects, container) {
-  const labels = { career:'💼事业', wealth:'💰财富', happy:'❤️幸福', smart:'🧠智力' };
+  const labels = { career:'💼事业', wealth:'💰财富', happy:'❤️幸福', smart:'🧠智力', promo:'🚀晋升' };
   Object.entries(effects || {}).forEach(([k, v]) => {
     if (!v || k === 'age') return;
+    if (!labels[k]) return;
     const tag = document.createElement('div');
     tag.className = 'effect-tag ' + (v > 0 ? 'positive' : 'negative');
     tag.textContent = `${labels[k]} ${v > 0 ? '+' : ''}${v}`;
@@ -1377,6 +1640,9 @@ function renderEffects(effects, container) {
 
 function finishEvent(ev, choiceText, effects, isCrossroad) {
   applyStat(effects);
+  // 资历自然增长：每过一轮攒一点晋升点数
+  state.promo += Math.round(3 * state.promoRate);
+  checkPromotion();
   const summary = choiceText ? `${ev.title}（${choiceText.replace(/^[ABC]\. /, '')}）` : ev.title;
   state.history.push({ age: state.age, icon: ev.icon, text: summary });
   renderHistory();
@@ -1389,7 +1655,6 @@ function finishEvent(ev, choiceText, effects, isCrossroad) {
     return;
   }
 
-  // 每 3 轮触发一个岔路（第 3、6、9、12 轮结束后）
   if (!isCrossroad && state.turnCount % 3 === 0) {
     setTimeout(triggerCrossroad, 500);
   } else {
@@ -1399,7 +1664,13 @@ function finishEvent(ev, choiceText, effects, isCrossroad) {
 }
 
 function triggerCrossroad() {
-  const available = CROSSROADS.filter(c => !state.usedCrossroads.includes(c.id));
+  const available = CROSSROADS.filter(c => {
+    if (state.usedCrossroads.includes(c.id)) return false;
+    if (c.minAge && state.age < c.minAge) return false;
+    if (c.maxAge && state.age > c.maxAge) return false;
+    if (c.require && !c.require(state)) return false;
+    return true;
+  });
   if (available.length === 0) {
     state.isSpinning = false;
     $('spinBtn').disabled = false;
@@ -1415,13 +1686,16 @@ function triggerCrossroad() {
     desc: cr.desc,
     choices: cr.choices,
     isCrossroad: true,
-    onDone: (choiceText, effects) => finishEvent(cr, choiceText, effects, true)
+    onDone: (choiceText, effects, flag) => {
+      if (flag) state[flag] = true;
+      finishEvent(cr, choiceText, effects, true);
+    }
   });
 }
 
 function renderHistory() {
   $('historyList').innerHTML = state.history.slice().reverse().map(h =>
-    `<div class="history-item"><span class="history-age">${h.age}岁</span> ${h.icon} ${h.text}</div>`
+    `<div class="history-item${h.isPromo ? ' promo' : ''}"><span class="history-age">${h.age}岁</span> ${h.icon} ${h.text}</div>`
   ).join('');
 }
 
@@ -1443,6 +1717,19 @@ function showEnding() {
     if (e.minSmart && s >= e.minSmart) { ending = e; break; }
     if (e.total !== undefined && total >= e.total) { ending = e; break; }
   }
+
+  // 职级成就覆盖：达到晋升线顶级/次顶级，结局标签升级
+  const track = CAREER_TRACKS[state.track];
+  const topTags = {
+    corporate: ['执掌一方的 CEO', '叱咤商界'],
+    academic:  ['桃李天下的院士', '学界泰斗'],
+    civil:     ['国之栋梁', '为民请命一辈子'],
+    startup:   ['敲钟上市的传奇', '商业帝国缔造者'],
+    freelance: ['行业标杆', '自由而丰盛'],
+  };
+  let levelTitle = track ? track.levels[state.level] : '';
+
+  if ($('endingTitle')) $('endingTitle').textContent = `✨ ${state.age} 岁 · 人生总结 ✨`;
   $('endingTag').textContent = ending.tag;
   $('endingDesc').textContent = ending.desc;
   $('finalCareer').textContent = c;
@@ -1450,67 +1737,88 @@ function showEnding() {
   $('finalHappy').textContent = h;
   $('finalSmart').textContent = s;
 
-  // 生成人生总结
-  $('lifeSummary').textContent = buildLifeSummary(ending, { c, w, h, s, total });
+  $('lifeSummary').textContent = buildLifeSummary(ending, { c, w, h, s, total }, levelTitle);
 }
 
 // ===== 人生总结生成 =====
-function buildLifeSummary(ending, stats) {
+function buildLifeSummary(ending, stats, levelTitle) {
   const { c, w, h, s } = stats;
   const name = state.name || '这位朋友';
   const eduMap = { college:'大专', bachelor:'本科', master:'硕士', phd:'博士' };
   const edu = eduMap[state.edu] || '本科';
+  const track = CAREER_TRACKS[state.track];
 
-  // 毕业选择描述
+  // 毕业选择
   const gradPath = GRADUATE_PATHS[state.gradPath];
   let gradText = '';
   if (gradPath) {
     if (state.gradSubPath) {
       const sub = gradPath.subs.find(x => x.id === state.gradSubPath);
-      gradText = `${edu}毕业后，你选择进入${sub ? sub.label : gradPath.label}，开启了职业生涯。`;
+      gradText = `${edu}毕业后，你选择进入${sub ? sub.label : gradPath.label}，从一名${track ? track.levels[0] : '新人'}做起。`;
     } else if (state.gradPath === 'study') {
-      gradText = `${edu}毕业后，你没有着急工作，选择继续深造。`;
+      gradText = `${edu}毕业后，你选择继续深造，走上了学术之路。`;
     } else if (state.gradPath === 'gaokao') {
-      gradText = `${edu}毕业后，你选择备考公务员，踏上了体制内的道路。`;
+      gradText = `${edu}毕业后，你考公上岸，从${track ? track.levels[0] : '科员'}干起。`;
+    } else if (state.gradPath === 'startup') {
+      gradText = `${edu}毕业后，你没有选择打工，而是直接创业当了老板。`;
     } else if (state.gradPath === 'gapyear') {
-      gradText = `${edu}毕业后，你没有立刻进入职场，而是选择 Gap Year，先去看看世界。`;
-    } else {
-      gradText = `${edu}毕业后，你选择了${gradPath.label}。`;
+      gradText = `${edu}毕业后，你先 Gap 了一年去看世界，然后走上了自由职业的路。`;
     }
   }
 
-  // 属性维度画像（4 维强弱分析）
-  const dims = [
-    { key:'career', name:'事业', val:c, high:'事业上你走到了别人仰望的位置', mid:'事业稳中有进，算得上体面', low:'事业不算顺利，一直在起伏里挣扎' },
-    { key:'wealth', name:'财富', val:w, high:'财富自由早已不是梦想', mid:'手头宽裕，日子过得踏实', low:'钱包一直是心事，紧巴巴地过' },
-    { key:'happy',  name:'幸福', val:h, high:'心态平和，笑容多，是身边人羡慕的对象', mid:'情绪起伏在正常范围，日子有滋有味', low:'心里总有些拧巴，快乐来得少去得快' },
-    { key:'smart',  name:'智力', val:s, high:'读万卷书行万里路，谈吐里藏着智慧', mid:'保持学习习惯，认知在稳步生长', low:'停止了成长，认知固化在了年轻时' },
-  ];
-  const dimText = (d) => d.val >= 75 ? d.high : d.val >= 45 ? d.mid : d.low;
+  // 职级成就
+  let careerText = '';
+  if (track && state.level > 0) {
+    const pct = state.level / (track.levels.length - 1);
+    if (pct >= 0.99) {
+      careerText = `职业生涯堪称传奇——你一路做到了「${levelTitle}」，站上了这条路的最顶端。`;
+    } else if (pct >= 0.6) {
+      careerText = `职业上你走得很远，最终做到了「${levelTitle}」，足以让大多数同龄人仰望。`;
+    } else if (pct >= 0.3) {
+      careerText = `职业上稳步前行，做到了「${levelTitle}」，不算惊艳但足够踏实。`;
+    } else {
+      careerText = `职业停在了「${levelTitle}」，或许职级从来就不是你人生的重心。`;
+    }
+  } else if (track) {
+    careerText = `职级上你始终是${track.levels[0]}，但人生的价值从不只有升职这一个刻度。`;
+  }
 
-  const strongest = dims.slice().sort((a,b)=>b.val-a.val)[0];
-  const weakest = dims.slice().sort((a,b)=>a.val-b.val)[0];
+  // 家庭线
+  let familyText = '';
+  if (state.married && state.hasKid) {
+    familyText = '你组建了自己的家庭，有伴侣也有孩子，热闹和鸡飞狗跳都是生活的注脚。';
+  } else if (state.married) {
+    familyText = '你和爱人携手走过了大半生，两个人的世界安静而自在。';
+  } else {
+    familyText = '你没有走进婚姻，一个人把日子过成了自己喜欢的样子。';
+  }
+  if (state.hasHouse) familyText += '名下有一套属于自己的房子，那是你安全感的来源之一。';
 
-  // 事件回顾：从 history 里抽 3 个关键事件（首、中、末）
-  const events = state.history.filter(h => !h.text.startsWith('毕业选择'));
+  // 事件回顾
+  const events = state.history.filter(x => !x.text.startsWith('毕业选择') && !x.isPromo);
   let eventText = '';
   if (events.length >= 3) {
     const first = events[0];
     const mid = events[Math.floor(events.length / 2)];
     const last = events[events.length - 1];
-    eventText = `\n\n回望这几十年：\n· 年轻时（${first.age}岁）遇到"${first.text}"，让你第一次感受到人生的变数；\n· 中年时（${mid.age}岁）经历了"${mid.text}"，这段经历影响深远；\n· 而在人生的后半段（${last.age}岁）"${last.text}"，为这一生画上了独特的一笔。`;
-  } else if (events.length > 0) {
-    eventText = `\n\n这一路走来，"${events[events.length-1].text}" 是你印象最深的一段经历。`;
+    eventText = `\n\n回望这几十年：\n· ${first.age}岁那年，"${first.text}"让你第一次感受到人生的变数；\n· ${mid.age}岁时经历的"${mid.text}"，影响深远；\n· 而${last.age}岁的"${last.text}"，为人生后半程添上独特一笔。`;
   }
 
-  // 岔路回顾（人生重大决策）
+  // 岔路
   const usedCr = state.usedCrossroads.length;
-  let crText = '';
-  if (usedCr > 0) {
-    crText = `\n\n人生的岔路口，你做了 ${usedCr} 次重要选择——${usedCr >= 3 ? '有些选对了，有些回头看未必最优' : '每一步都算数'}，但正是这些决定塑造了今天的你。`;
-  }
+  let crText = usedCr > 0 ? `\n\n人生的岔路口，你做了 ${usedCr} 次重要选择。有些选对了，有些回头看未必最优——但正是这些决定塑造了今天的你。` : '';
 
-  // 结尾金句
+  // 四维画像
+  const dims = [
+    { name:'事业', val:c, high:'事业上你走到了别人仰望的位置', mid:'事业稳中有进', low:'事业一直起起伏伏' },
+    { name:'财富', val:w, high:'财富早已不是烦恼', mid:'手头宽裕日子踏实', low:'钱包始终是心事' },
+    { name:'幸福', val:h, high:'你是身边人羡慕的幸福样本', mid:'日子有滋有味', low:'快乐来得少去得快' },
+    { name:'智力', val:s, high:'谈吐里都藏着智慧', mid:'认知在稳步生长', low:'认知停在了年轻时' },
+  ];
+  const dimText = d => d.val >= 75 ? d.high : d.val >= 45 ? d.mid : d.low;
+  const strongest = dims.slice().sort((a,b)=>b.val-a.val)[0];
+  const weakest = dims.slice().sort((a,b)=>a.val-b.val)[0];
+
   const closingMap = {
     '职场传奇': '如果重来一次，你大概还是会选这条路。',
     '财富自由': '钱不是万能的，但没有钱是万万不能的——这句话你比谁都懂。',
@@ -1518,22 +1826,17 @@ function buildLifeSummary(ending, stats) {
     '智慧长者': '晚辈们喜欢来找你聊天，因为你总能给出他们没想过的角度。',
     '人生赢家': '四平八稳，各得其所，这就是所谓的圆满吧。',
     '佛系人生': '不焦虑不攀比，日子慢慢过，这也是一种赢。',
-    '普通打工人': '和大多数人一样，起起落落，但你活出了自己的节奏。',
-    '跌宕人生': '大起大落都经历过，回头看，这才叫真正活过。',
+    '普通打工人': '和大多数人一样起起落落，但你活出了自己的节奏。',
+    '跌宕人生': '大起大落都经历过，这才叫真正活过。',
     '黯淡收场': '如果人生可以重来……下一局，一定会不一样。',
   };
   const closing = closingMap[ending.tag] || '这就是属于你的人生。';
 
-  const summary =
-    `${name}（${edu}），60 岁。\n\n` +
-    `${gradText}` +
-    `${eventText}` +
-    `${crText}\n\n` +
+  return `${name}（${edu}），${state.age} 岁。\n\n` +
+    `${gradText}${careerText}\n\n${familyText}` +
+    `${eventText}${crText}\n\n` +
     `到了这个年纪回头看：${dimText(strongest)}，但${dimText(weakest)}。` +
-    `最终你以「${ending.tag}」收场——${ending.desc}\n\n` +
-    `${closing}`;
-
-  return summary;
+    `最终你以「${ending.tag}」收场——${ending.desc}\n\n${closing}`;
 }
 
 // ===== 复制 & 分享 =====
@@ -1542,7 +1845,6 @@ function copySummary() {
   navigator.clipboard.writeText(text).then(() => {
     alert('已复制到剪贴板，可以发给朋友炫耀啦～');
   }).catch(() => {
-    // 兜底
     const ta = document.createElement('textarea');
     ta.value = text;
     document.body.appendChild(ta);
@@ -1555,15 +1857,16 @@ function copySummary() {
 
 function shareSummary() {
   const tag = $('endingTag').textContent;
+  const track = CAREER_TRACKS[state.track];
+  const levelTitle = track ? track.levels[state.level] : '';
   const c = $('finalCareer').textContent, w = $('finalWealth').textContent,
         h = $('finalHappy').textContent, s = $('finalSmart').textContent;
   const summary = $('lifeSummary').textContent;
   const shareText =
-    `🎮 我在【人生转盘】里的结局是：${tag}\n\n` +
+    `🎮 我在【人生转盘】里的结局是：${tag}${levelTitle ? '（' + levelTitle + '）' : ''}\n\n` +
     `💼事业 ${c} | 💰财富 ${w}\n` +
     `❤️幸福 ${h} | 🧠智力 ${s}\n\n` +
-    `${summary}\n\n` +
-    `———\n你也来玩一把：${location.href.split('#')[0]}`;
+    `${summary}\n\n———\n你也来玩一把：${location.href.split('#')[0]}`;
   navigator.clipboard.writeText(shareText).then(() => {
     alert('战绩卡已复制，粘贴到群里让大家看看你的人生～');
   }).catch(() => {
