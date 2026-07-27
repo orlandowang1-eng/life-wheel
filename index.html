@@ -413,6 +413,35 @@
   /* 家庭事件历史条目 */
   .history-item.family { color: var(--pixel-pink, #ff77a8); }
 
+
+  /* ---- 晋升提示横幅 ---- */
+  .promo-toast {
+    position: fixed;
+    top: -120px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 999;
+    background: linear-gradient(135deg, #ffd700, #ffb700);
+    color: #2a1a00;
+    padding: 16px 28px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: bold;
+    text-align: center;
+    box-shadow: 0 0 0 4px #2a1a00, 0 0 0 8px #ffd700, 6px 6px 0 8px rgba(0,0,0,0.5);
+    transition: top 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none;
+    max-width: 80vw;
+  }
+  .promo-toast.show { top: 24px; }
+  .promo-toast .promo-toast-title {
+    font-size: 11px;
+    letter-spacing: 2px;
+    margin-bottom: 6px;
+    opacity: 0.75;
+  }
+  .promo-toast .promo-toast-level { font-size: 16px; }
+
   /* ---- Event Modal ---- */
   .event-modal {
     display: none;
@@ -1659,6 +1688,25 @@ function scaleEffects(effects, factor) {
 }
 const EVENT_SCALE = 0.4;
 
+// ===== 晋升提示横幅 =====
+let promoToastTimer = null;
+let promoToastQueue = [];
+function showPromoToast(levelName, trackName) {
+  promoToastQueue.push({ levelName, trackName });
+  if (!promoToastTimer) nextPromoToast();
+}
+function nextPromoToast() {
+  const item = promoToastQueue.shift();
+  if (!item) { promoToastTimer = null; return; }
+  const toast = $('promoToast');
+  toast.innerHTML = `<div class="promo-toast-title">🎉 恭喜晋升 🎉</div><div class="promo-toast-level">${item.trackName} · ${item.levelName}</div>`;
+  toast.classList.add('show');
+  promoToastTimer = setTimeout(() => {
+    toast.classList.remove('show');
+    promoToastTimer = setTimeout(nextPromoToast, 400);
+  }, 2200);
+}
+
 // ===== 晋升检查 =====
 function checkPromotion() {
   const track = CAREER_TRACKS[state.track];
@@ -1676,6 +1724,7 @@ function checkPromotion() {
         }
       });
       state.history.push({ age: state.age, icon: '🎉', text: `晋升为「${track.levels[l]}」！`, isPromo: true });
+      showPromoToast(track.levels[l], track.name.replace('线', ''));
     }
     state.level = newLevel;
     state.peakLevel = Math.max(state.peakLevel, newLevel);
@@ -2571,5 +2620,6 @@ function shareSummary() {
 }
 
 </script>
+  <div class="promo-toast" id="promoToast"></div>
 </body>
 </html>
