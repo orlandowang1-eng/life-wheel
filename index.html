@@ -1035,17 +1035,17 @@ function makePartner(senior) {
 // track: 仅该晋升线可见；effects 可含 promo（晋升点数）
 const EVENTS = {
   career: [
-    // --- 通用职场 ---
-    { icon:'📈', title:'绩效拿了 A+', desc:'季度绩效 A+，全组会上被点名表扬。', maxAge:55, effects:{ career:+10, wealth:+5, happy:+5, promo:+6 } },
-    { icon:'📉', title:'项目黄了', desc:'跟了半年的项目被砍，心血付诸东流。', maxAge:55, effects:{ career:-8, happy:-8, smart:+3 } },
-    { icon:'🏆', title:'年度优秀员工', desc:'年会上台领奖，还有一笔奖金。', maxAge:55, effects:{ career:+12, wealth:+12, happy:+10, promo:+8 } },
-    { icon:'😤', title:'和上级吵架', desc:'方案理念冲突，你和上级当场 argue。', maxAge:50, effects:{ career:-6, happy:-5, smart:+3 } },
-    { icon:'💤', title:'摸鱼的快乐', desc:'找到了摸鱼节奏，日子松弛了。', effects:{ career:-4, happy:+10, smart:-3, promo:-3 } },
-    { icon:'😩', title:'背锅侠', desc:'别人捅的娄子算到你头上。', maxAge:50, effects:{ career:-8, happy:-10, smart:+5 } },
-    { icon:'🎤', title:'公开分享出圈', desc:'一次分享讲得特别好，很多人认识了你。', maxAge:55, effects:{ career:+8, happy:+8, smart:+8, promo:+5 } },
-    { icon:'🤝', title:'带出了好徒弟', desc:'你带的新人成长飞快，上面看在眼里。', minAge:26, effects:{ career:+6, happy:+8, promo:+5 } },
-    { icon:'☕', title:'小道消息', desc:'茶水间听到组织调整的风声，提前做了准备。', effects:{ career:+3, smart:+5, promo:+2 } },
-    { icon:'💼', title:'接了个硬仗', desc:'没人敢接的项目你接了，做成了。', minAge:24, maxAge:50, effects:{ career:+12, smart:+8, happy:-5, promo:+10 } },
+    // --- 打工人通用（企业线为主）---
+    { icon:'📈', title:'绩效拿了 A+', desc:'季度绩效 A+，全组会上被点名表扬。', tracks:['corporate'], maxAge:55, effects:{ career:+10, wealth:+5, happy:+5, promo:+6 } },
+    { icon:'📉', title:'项目黄了', desc:'跟了半年的项目被砍，心血付诸东流。', tracks:['corporate'], maxAge:55, effects:{ career:-8, happy:-8, smart:+3 } },
+    { icon:'🏆', title:'年度优秀员工', desc:'年会上台领奖，还有一笔奖金。', tracks:['corporate'], maxAge:55, effects:{ career:+12, wealth:+12, happy:+10, promo:+8 } },
+    { icon:'😤', title:'和上级吵架', desc:'方案理念冲突，你和上级当场 argue。', tracks:['corporate'], maxAge:50, effects:{ career:-6, happy:-5, smart:+3 } },
+    { icon:'💤', title:'摸鱼的快乐', desc:'找到了摸鱼节奏，日子松弛了。', tracks:['corporate','civil'], effects:{ career:-4, happy:+10, smart:-3, promo:-3 } },
+    { icon:'😩', title:'背锅侠', desc:'别人捅的娄子算到你头上。', tracks:['corporate','civil'], maxAge:50, effects:{ career:-8, happy:-10, smart:+5 } },
+    { icon:'🎤', title:'公开分享出圈', desc:'一次分享讲得特别好，很多人认识了你。', tracks:['corporate','freelance'], maxAge:55, effects:{ career:+8, happy:+8, smart:+8, promo:+5 } },
+    { icon:'🤝', title:'带出了好徒弟', desc:'你带的新人成长飞快，上面看在眼里。', tracks:['corporate','civil','diplomat','academic'], minAge:26, effects:{ career:+6, happy:+8, promo:+5 } },
+    { icon:'☕', title:'小道消息', desc:'茶水间听到组织调整的风声，提前做了准备。', tracks:['corporate','civil'], effects:{ career:+3, smart:+5, promo:+2 } },
+    { icon:'💼', title:'接了个硬仗', desc:'没人敢接的项目你接了，做成了。', tracks:['corporate','startup','civil'], minAge:24, maxAge:50, effects:{ career:+12, smart:+8, happy:-5, promo:+10 } },
 
     // --- 企业线专属 ---
     { icon:'🚪', title:'晋升答辩', desc:'晋升窗口开了，答辩表现不错。', track:'corporate', minAge:24, maxAge:48, effects:{ career:+8, promo:+12 } },
@@ -1092,6 +1092,9 @@ const EVENTS = {
     { icon:'🤳', title:'接到品牌大单', desc:'一线品牌找你合作，报价翻了三倍。', track:'freelance', effects:{ wealth:+18, career:+8, promo:+8 } },
     { icon:'😶', title:'流量寒冬', desc:'连续三个月数据扑街，自我怀疑中。', track:'freelance', effects:{ happy:-12, wealth:-8, smart:+8 } },
     { icon:'📚', title:'出了一本书', desc:'把经验写成书，卖得还不错。', track:'freelance', minAge:28, effects:{ career:+10, wealth:+8, smart:+8, promo:+10 } },
+    { icon:'🎪', title:'甲方反复横跳', desc:'改了八版方案，甲方说还是用第一版吧。', track:'freelance', effects:{ happy:-8, smart:+5, wealth:+5 } },
+    { icon:'🧑‍🏫', title:'开班授课', desc:'把手艺做成课程，学员口碑不错。', track:'freelance', minAge:26, effects:{ wealth:+10, career:+6, promo:+8 } },
+    { icon:'🏝️', title:'数字游民一个月', desc:'带着电脑去海边工作了一个月，效率反而更高。', track:'freelance', effects:{ happy:+12, smart:+5 } },
   ],
 
   wealth: [
@@ -1103,12 +1106,12 @@ const EVENTS = {
     { icon:'💸', title:'股票被套', desc:'重仓的票跌了 40%。', minAge:24, effects:{ wealth:-18, happy:-10, smart:+5 } },
     { icon:'🎰', title:'刮刮乐中奖', desc:'路边买的刮刮乐中了 5000 块！', effects:{ wealth:+8, happy:+10 } },
     { icon:'😱', title:'理财踩雷', desc:'买的理财产品暴雷了。', minAge:26, effects:{ wealth:-20, happy:-12, smart:+8 } },
-    { icon:'💰', title:'普调 + 大红包', desc:'年度调薪普涨，还发了留任奖金。', maxAge:52, effects:{ wealth:+12, happy:+8 } },
+    { icon:'💰', title:'普调 + 大红包', desc:'年度调薪普涨，还发了留任奖金。', tracks:['corporate'], maxAge:52, effects:{ wealth:+12, happy:+8 } },
     { icon:'📈', title:'定投开花结果', desc:'坚持定投五年，收益率跑赢大盘。', minAge:28, effects:{ wealth:+15, smart:+5, happy:+8 } },
-    { icon:'🍜', title:'副业有起色', desc:'周末摆摊/接单，月入过万。', minAge:24, maxAge:45, effects:{ wealth:+10, happy:+8, career:-2 } },
+    { icon:'🍜', title:'副业有起色', desc:'周末摆摊/接单，月入过万。', tracks:['corporate','startup','freelance'], minAge:24, maxAge:45, effects:{ wealth:+10, happy:+8, career:-2 } },
     { icon:'💳', title:'消费主义陷阱', desc:'双 11 冲动消费，账单让你窒息。', effects:{ wealth:-10, happy:-5, smart:+3 } },
     { icon:'🏠', title:'房租暴涨', desc:'房东一句"市场价"，月租涨了 800。', maxAge:40, effects:{ wealth:-8, happy:-8 } },
-    { icon:'💵', title:'年终奖爆了', desc:'公司业绩好，年终奖发了 6 个月。', maxAge:52, effects:{ wealth:+20, happy:+15 } },
+    { icon:'💵', title:'年终奖爆了', desc:'公司业绩好，年终奖发了 6 个月。', tracks:['corporate'], maxAge:52, effects:{ wealth:+20, happy:+15 } },
     { icon:'👴', title:'帮父母理财', desc:'阻止了爸妈买"高息理财"，避免了损失。', minAge:28, effects:{ wealth:+5, smart:+8, happy:+8 } },
     { icon:'🚗', title:'买车了', desc:'提了人生第一辆车，通勤自由。', minAge:25, maxAge:45, effects:{ wealth:-15, happy:+12 } },
     { icon:'🪙', title:'数字货币过山车', desc:'朋友拉你买币，一周经历暴涨暴跌。', minAge:24, maxAge:40, effects:null,
@@ -1145,16 +1148,16 @@ const EVENTS = {
     { icon:'🎨', title:'解锁新爱好', desc:'开始学画画/摄影/乐器，生活有了盼头。', effects:{ happy:+12, smart:+8, wealth:-5 } },
     { icon:'🏠', title:'搬进心仪的房子', desc:'换了个采光好的房子，幸福感暴涨。', effects:{ happy:+10, wealth:-8 } },
     { icon:'🍺', title:'老友重聚', desc:'大学室友聚齐了，聊到凌晨三点。', effects:{ happy:+10, wealth:-3 } },
-    { icon:'🥱', title:'报复性熬夜', desc:'白天属于工作，只有深夜属于自己。', maxAge:45, effects:{ happy:-5, smart:-5, career:+3 } },
-    { icon:'🚇', title:'通勤地狱', desc:'单程通勤 2 小时，人在工位魂在地铁。', maxAge:45, effects:{ happy:-10, smart:+3 } },
+    { icon:'🥱', title:'报复性熬夜', desc:'白天属于工作，只有深夜属于自己。', tracks:['corporate','startup','civil','diplomat'], maxAge:45, effects:{ happy:-5, smart:-5, career:+3 } },
+    { icon:'🚇', title:'通勤地狱', desc:'单程通勤 2 小时，人在工位魂在地铁。', tracks:['corporate','civil'], maxAge:45, effects:{ happy:-10, smart:+3 } },
     { icon:'🎢', title:'来一场说走就走的旅行', desc:'请了年假去看海，整个人被治愈。', effects:{ happy:+15, wealth:-8 } },
     { icon:'🍔', title:'外卖依赖症', desc:'连续一个月外卖，胖了 5 斤。', effects:{ happy:-3, wealth:-5 } },
-    { icon:'🌿', title:'工位绿植计划', desc:'工位变成小花园，心情都好了。', effects:{ happy:+5, smart:+3 } },
+    { icon:'🌿', title:'工位绿植计划', desc:'工位变成小花园，心情都好了。', tracks:['corporate','civil','diplomat','academic'], effects:{ happy:+5, smart:+3 } },
     { icon:'🧘', title:'开始冥想', desc:'每天 10 分钟冥想，焦虑少了很多。', minAge:28, effects:{ happy:+10, smart:+5 } },
     { icon:'🏊', title:'学会了游泳', desc:'30 多岁学会游泳，谁说晚了？', minAge:28, effects:{ happy:+8, smart:+3 } },
     { icon:'🛋️', title:'宅家的一年', desc:'这一年几乎没出门社交，省钱但有点闷。', effects:{ wealth:+8, happy:-5 } },
     // --- 老年专属 ---
-    { icon:'🌅', title:'退休生活开启', desc:'正式退休了，时间终于完全属于自己。', minAge:58, effects:{ happy:+15, career:-5 } },
+    { icon:'🌅', title:'退休生活开启', desc:'正式退休了，时间终于完全属于自己。', minAge:58, require: s => s.track !== 'diplomat' || s.retired, effects:{ happy:+15, career:-5 } },
     { icon:'💃', title:'广场舞C位', desc:'你成了小区广场舞的领舞，粉丝一堆。', minAge:60, effects:{ happy:+12 } },
     { icon:'🎣', title:'钓鱼的一整天', desc:'一竿一椅一下午，什么都没钓到但很快乐。', minAge:55, effects:{ happy:+10 } },
     { icon:'✈️', title:'老两口游世界', desc:'和老伴报了旅行团，把年轻时想去的地方走了一遍。', minAge:60, require: s => s.married, effects:{ happy:+18, wealth:-12 } },
@@ -1164,14 +1167,20 @@ const EVENTS = {
   ],
 
   study: [
-    { icon:'📚', title:'考证上岸', desc:'备考半年的证书拿下了。', maxAge:50, effects:{ smart:+12, career:+8, happy:+5, promo:+5 } },
+    { icon:'📚', title:'考证上岸', desc:'备考半年的证书拿下了。', tracks:['corporate','civil','freelance','startup'], maxAge:50, effects:{ smart:+12, career:+8, happy:+5, promo:+5 } },
     { icon:'🧠', title:'一本书改变认知', desc:'读到一本颠覆认知的书。', effects:{ smart:+8, happy:+5 } },
     { icon:'💻', title:'学会了 AI 工具', desc:'掌握了新的 AI 工具，效率翻倍。', effects:{ smart:+10, career:+8, promo:+5 } },
-    { icon:'🗣️', title:'外语突破', desc:'坚持学外语两年，能流利对话了。', effects:{ smart:+10, career:+5 } },
-    { icon:'📖', title:'夜校新青年', desc:'报了夜校，认识了一群有趣的人。', maxAge:45, effects:{ smart:+10, happy:+5, wealth:-3 } },
-    { icon:'❌', title:'考试连挂', desc:'考了三次还是没过，怀疑人生。', effects:{ smart:+5, happy:-8, wealth:-3 } },
-    { icon:'🎙️', title:'开始做播客', desc:'和朋友做了档播客，小有听众。', minAge:25, maxAge:45, effects:{ smart:+8, happy:+8, career:+3 } },
+    { icon:'🗣️', title:'外语突破', desc:'坚持学外语两年，能流利对话了。', tracks:['corporate','civil','startup','freelance','academic'], effects:{ smart:+10, career:+5 } },
+    { icon:'📖', title:'夜校新青年', desc:'报了夜校，认识了一群有趣的人。', tracks:['corporate','civil','freelance'], maxAge:45, effects:{ smart:+10, happy:+5, wealth:-3 } },
+    { icon:'❌', title:'考试连挂', desc:'考了三次还是没过，怀疑人生。', tracks:['corporate','civil','freelance'], effects:{ smart:+5, happy:-8, wealth:-3 } },
+    { icon:'🎙️', title:'开始做播客', desc:'和朋友做了档播客，小有听众。', tracks:['corporate','freelance','startup'], minAge:25, maxAge:45, effects:{ smart:+8, happy:+8, career:+3 } },
     { icon:'✍️', title:'坚持写作一年', desc:'公众号/博客写了一年，思维清晰了很多。', effects:{ smart:+10, career:+5, promo:+3 } },
+    // --- 学术线专属日常 ---
+    { icon:'🔬', title:'组会汇报翻车', desc:'组会上被导师连环追问，冷汗直流。', track:'academic', maxAge:32, effects:{ smart:+8, happy:-5 } },
+    { icon:'☕', title:'审稿人日常', desc:'帮期刊审了三篇稿，学到了也吐槽了。', track:'academic', minAge:28, effects:{ smart:+8, career:+3, promo:+3 } },
+    { icon:'🧑‍🏫', title:'第一次站上讲台', desc:'第一次给本科生上课，紧张但兴奋。', track:'academic', minAge:26, maxAge:36, effects:{ career:+6, happy:+8, promo:+5 } },
+    // --- 外交线专属学习 ---
+    { icon:'🌐', title:'区域国别研究', desc:'系统研究驻在国政经形势，成了半个专家。', track:'diplomat', effects:{ smart:+12, career:+5, promo:+5 } },
   ],
 
   social: [
@@ -1184,7 +1193,7 @@ const EVENTS = {
     { icon:'👥', title:'找到同频圈子', desc:'加入一个宝藏社群，周末有了去处。', effects:{ happy:+10, smart:+5 } },
     { icon:'😠', title:'多年好友闹掰', desc:'因为一件小事，和老友渐行渐远。', effects:{ happy:-12, smart:+5 } },
     { icon:'🎉', title:'婚礼上的伴郎/伴娘', desc:'给最好的朋友当伴郎/伴娘。', minAge:25, maxAge:38, effects:{ happy:+10, wealth:-5 } },
-    { icon:'🍻', title:'团建 K 歌', desc:'被逼着唱了 3 首，意外获得好评。', maxAge:45, effects:{ happy:+5, career:+3 } },
+    { icon:'🍻', title:'团建 K 歌', desc:'被逼着唱了 3 首，意外获得好评。', tracks:['corporate','civil','diplomat','startup'], maxAge:45, effects:{ happy:+5, career:+3 } },
     { icon:'🧧', title:'份子钱刺客', desc:'一个月三场婚礼，钱包被掏空。', minAge:26, maxAge:38, effects:{ wealth:-8, happy:-3 } },
     { icon:'🌉', title:'贵人引荐', desc:'朋友把你引荐给了行业大佬。', minAge:26, effects:{ career:+10, smart:+5, promo:+6 } },
     { icon:'🤗', title:'帮了别人一个大忙', desc:'顺手帮的忙，对方记了很多年。', effects:{ happy:+8, smart:+3 } },
@@ -1259,7 +1268,7 @@ const CROSSROADS = [
   },
   {
     id:'cr_mba', icon:'🎓', title:'充电还是赚钱', minAge:27, maxAge:40,
-    require: s => s.track !== 'academic',
+    require: s => ['corporate','startup','freelance'].includes(s.track),
     desc:'工作几年遇到瓶颈，要不要回炉深造？',
     choices:[
       { text:'A. 脱产读研，彻底充电', effects:{ career:-5, wealth:-20, smart:+25 } },
@@ -1299,11 +1308,32 @@ const CROSSROADS = [
   },
   {
     id:'cr_midlife', icon:'😰', title:'中年危机', minAge:35, maxAge:48,
+    require: s => ['corporate','startup','freelance'].includes(s.track),
     desc:'行业动荡，身边同龄人接连"毕业"。你开始睡不好了。',
     choices:[
       { text:'A. 主动求变，转型新赛道', effects:{ career:-5, smart:+15, happy:+5, promo:+5 } },
       { text:'B. 深耕不动，做到不可替代', effects:{ career:+10, smart:+8, happy:-5, promo:+8 } },
       { text:'C. 降低欲望，主动降档', effects:{ wealth:-10, happy:+15 } },
+    ]
+  },
+  {
+    id:'cr_midlife_civil', icon:'😶‍🌫️', title:'四十不惑？', minAge:38, maxAge:50,
+    require: s => s.track === 'civil' || s.track === 'diplomat',
+    desc:'同批入职的老同事有的提了、有的躺了。你在办公室看着窗外，想了很久。',
+    choices:[
+      { text:'A. 再冲一把，争取进步', effects:{ career:+8, happy:-5, promo:+10 } },
+      { text:'B. 摆正心态，干好本职', effects:{ happy:+10, career:+3, promo:+3 } },
+      { text:'C. 把重心放回家庭', effects:{ happy:+12, career:-3 } },
+    ]
+  },
+  {
+    id:'cr_midlife_academic', icon:'📉', title:'学术中年', minAge:38, maxAge:50,
+    require: s => s.track === 'academic',
+    desc:'基金越来越难拿，年轻人一个比一个卷。你的研究方向也到了瓶颈期。',
+    choices:[
+      { text:'A. 换个新方向，从头再来', effects:{ smart:+15, career:-5, happy:+3, promo:+5 } },
+      { text:'B. 深耕老本行，熬出头', effects:{ career:+8, smart:+5, happy:-5, promo:+8 } },
+      { text:'C. 重心转向教学育人', effects:{ happy:+12, career:+3 } },
     ]
   },
   {
@@ -1345,7 +1375,7 @@ const CROSSROADS = [
   },
   {
     id:'cr_sidegig', icon:'🌙', title:'副业的诱惑', minAge:26, maxAge:45,
-    require: s => s.track === 'corporate' || s.track === 'civil',
+    require: s => s.track === 'corporate',
     desc:'朋友的项目做起来了，想拉你入伙做副业，有搞头但费精力。',
     choices:[
       { text:'A. 加入，睡后收入香', effects:{ wealth:+15, happy:-8, career:-3 } },
@@ -1748,6 +1778,7 @@ function eligibleEvents(pool) {
     if (ev.minAge && state.age < ev.minAge) return false;
     if (ev.maxAge && state.age > ev.maxAge) return false;
     if (ev.track && ev.track !== state.track) return false;
+    if (ev.tracks && !ev.tracks.includes(state.track)) return false;
     if (ev.require && !ev.require(state)) return false;
     return true;
   });
