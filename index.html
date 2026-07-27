@@ -1186,7 +1186,7 @@ const EVENTS = {
     { icon:'🏊', title:'学会了游泳', desc:'30 多岁学会游泳，谁说晚了？', minAge:28, effects:{ happy:+8, smart:+3 } },
     { icon:'🛋️', title:'宅家的一年', desc:'这一年几乎没出门社交，省钱但有点闷。', effects:{ wealth:+8, happy:-5 } },
     // --- 老年专属 ---
-    { icon:'🌅', title:'退休生活开启', desc:'正式退休了，时间终于完全属于自己。', minAge:58, require: s => s.track !== 'diplomat' || s.retired, effects:{ happy:+15, career:-5 } },
+    { icon:'🌅', title:'退休生活开启', desc:'退休手续办完了，时间终于完全属于自己。', minAge:58, require: s => s.retired, effects:{ happy:+15, career:-5 } },
     { icon:'💃', title:'广场舞C位', desc:'你成了小区广场舞的领舞，粉丝一堆。', minAge:60, effects:{ happy:+12 } },
     { icon:'🎣', title:'钓鱼的一整天', desc:'一竿一椅一下午，什么都没钓到但很快乐。', minAge:55, effects:{ happy:+10 } },
     { icon:'✈️', title:'老两口游世界', desc:'和老伴报了旅行团，把年轻时想去的地方走了一遍。', minAge:60, require: s => s.married, effects:{ happy:+18, wealth:-12 } },
@@ -1478,7 +1478,9 @@ const state = {
   homeYears: 0,         // 本次国内已满年数
   postings: [],         // 历史外派国家
   spouseLocal: null,    // 跨国伴侣的国籍
-  retired: false,       // 外交官已退休
+  retired: false,       // 已退休（各职业通用）
+  retireAge: 60,        // 法定/当前退休年龄（每延退一次 +5）
+  retireDelays: 0,      // 延迟退休次数
   exDiplomat: false,    // 为爱辞官标记
 };
 
@@ -1736,7 +1738,7 @@ function checkPromotion() {
 function updateLevelDisplay() {
   const track = CAREER_TRACKS[state.track];
   if (track && $('displayLevel')) {
-    $('displayLevel').textContent = track.levels[state.level];
+    $('displayLevel').textContent = track.levels[state.level] + (state.retired && state.track !== 'diplomat' ? '·退' : '');
   }
   if (state.track === 'diplomat' && $('displayPath')) {
     $('displayPath').textContent = state.exDiplomat ? '前外交官' : (state.retired ? '退休外交官' : (state.abroad ? `外交官·驻${state.abroad}` : '外交官'));
@@ -1836,6 +1838,11 @@ function eligibleEvents(pool) {
 // ===== 触发事件 =====
 const CAREER_CATS = ['career','wealth','study'];
 function triggerEvent(categoryKey, categoryLabel) {
+  // 退休后不再有职场事件，转为生活事件
+  if (state.retired && categoryKey === 'career') {
+    categoryKey = 'life';
+    categoryLabel = '生活';
+  }
   let pool = eligibleEvents(EVENTS[categoryKey]);
   if (pool.length === 0) pool = eligibleEvents(EVENTS.life); // 兜底
   if (pool.length === 0) pool = EVENTS.life;
@@ -1953,9 +1960,11 @@ function renderEffects(effects, container) {
 function finishEvent(ev, choiceText, effects, isCrossroad) {
   // 普通事件效果折半（一年一轮），岔路保持原值
   applyStat(isCrossroad ? effects : scaleEffects(effects, EVENT_SCALE));
-  // 资历自然增长
-  state.promo += Math.round(1.5 * state.promoRate);
-  checkPromotion();
+  // 资历自然增长（退休后停止）
+  if (!state.retired) {
+    state.promo += Math.round(1.5 * state.promoRate);
+    checkPromotion();
+  }
   const summary = choiceText ? `${ev.title}（${choiceText.replace(/^[ABC]\. /, '')}）` : ev.title;
   state.history.push({ age: state.age, icon: ev.icon, text: summary, cls: ev._cls });
   renderHistory();
@@ -2211,9 +2220,9 @@ function endYear() {
     return;
   }
 
-  // 外交官轮岗：60 岁退休前，国内三年 ↔ 国外三年
+  // 外交官轮岗：退休前，国内三年 ↔ 国外三年
   if (state.track === 'diplomat' && !state.retired) {
-    if (state.age >= 60) {
+    if (state.age >= state.retireAge) {
       setTimeout(triggerDiplomatRetire, 400);
       return;
     }
@@ -2227,6 +2236,12 @@ function endYear() {
     }
   }
 
+  // 法定退休抉择（非外交线；外交线在轮岗逻辑里单独处理）
+  if (!state.retired && state.track !== 'diplomat' && state.age >= state.retireAge) {
+    setTimeout(triggerRetireChoice, 400);
+    return;
+  }
+
   // 人生岔路：每 4 年一次
   if (state.turnCount % 4 === 0) {
     setTimeout(triggerCrossroad, 400);
@@ -2234,6 +2249,51 @@ function endYear() {
     state.isSpinning = false;
     $('spinBtn').disabled = false;
   }
+}
+
+// ===== 法定退休抉择（通用） =====
+function triggerRetireChoice() {
+  const isFirst = state.retireDelays === 0;
+  const tooOld = state.age >= 75; // 75 岁以上不再提供延退
+  const descMap = {
+    corporate: isFirst ? `${state.retireAge} 岁，到了法定退休年龄。HR 找你谈话：办退休手续，还是返聘续约？` : `返聘期满。公司问你：还续吗？`,
+    civil:     isFirst ? `${state.retireAge} 岁，组织找你谈话：到点了，可以光荣退休，也可以留任发挥余热。` : `留任期满，组织再次征求你的意见。`,
+    academic:  isFirst ? `${state.retireAge} 岁，到了退休年龄。学院希望你返聘，继续带学生、做研究。` : `返聘期满，学院问你是否继续。`,
+    startup:   isFirst ? `${state.retireAge} 岁了。公司已经走上正轨，董事会问你：交棒退居二线，还是继续掌舵？` : `又干了五年，接班人也成熟了。这次呢？`,
+    freelance: isFirst ? `${state.retireAge} 岁了。同龄人都退休了，你其实自由惯了——要不要正式"封笔"？` : `又干了五年，身体开始提醒你了。`,
+  };
+  const choices = [
+    { text:'A. 光荣退休，享受生活', effects:{ happy:+15, career:-5 }, _retire:true },
+  ];
+  if (!tooOld) {
+    choices.push({ text:'B. 延迟退休 5 年，再干一程', effects:{ career:+8, happy:-5, promo:+10 }, _retire:false });
+  }
+  showEventModal({
+    icon: '🌅',
+    category: '职业事件 · 退休抉择',
+    title: tooOld ? `${state.age} 岁，真的到点了` : (isFirst ? '到了法定退休年龄' : '延退期满'),
+    desc: (descMap[state.track] || descMap.corporate) + (tooOld ? ' 这个年纪，身体不允许再拼了。' : ''),
+    choices,
+    evClass: 'work',
+    onDone: (choiceText, effects) => {
+      applyStat(effects);
+      const picked = choices.find(c => c.text === choiceText) || choices[0];
+      if (picked._retire === false) {
+        state.retireDelays++;
+        state.retireAge += 5;
+        state.promo += Math.round(10 * state.promoRate);
+        checkPromotion();
+        state.history.push({ age: state.age, icon:'💼', text:`选择延迟退休，继续干到 ${state.retireAge} 岁` });
+      } else {
+        state.retired = true;
+        state.history.push({ age: state.age, icon:'🌅', text:`正式退休（${state.age} 岁）` });
+      }
+      renderHistory();
+      updateDisplay();
+      state.isSpinning = false;
+      $('spinBtn').disabled = false;
+    }
+  });
 }
 
 // ===== 外交官轮岗事件 =====
@@ -2273,21 +2333,39 @@ function triggerPosting() {
 function triggerDiplomatRetire() {
   const from = state.abroad;
   const nPost = state.postings.length;
+  const tooOld = state.age >= 75;
+  const choices = [
+    { text:'A. 光荣退休，功成身退', effects:{ happy:+10, career:+5 }, _retire:true },
+  ];
+  if (!tooOld) {
+    choices.push({ text:'B. 接受返聘，再干 5 年', effects:{ career:+8, happy:-5, promo:+10 }, _retire:false });
+  }
   showEventModal({
     icon: '🎖️',
-    category: '职业事件 · 光荣退休',
-    title: '外交生涯落幕',
-    desc: `60 岁，你${from ? `结束驻${from}的最后一个任期，` : ''}正式从外交战线退休。${nPost} 个国家、无数次起落，护照上的章比相册还厚。部里为你办了简朴而隆重的欢送会。`,
-    effects: { happy:+10, career:+5 },
+    category: '职业事件 · 退休抉择',
+    title: tooOld ? '外交生涯落幕' : '到了退休年龄',
+    desc: `${state.age} 岁，你${from ? `结束驻${from}的最后一个任期，` : ''}到了退休年龄。${nPost} 个国家、无数次起落，护照上的章比相册还厚。${tooOld ? '部里为你办了简朴而隆重的欢送会。' : '部里希望你以资深专家身份返聘，继续参与重大外交事务。'}`,
+    choices,
     evClass: 'work',
-    onDone: (_, effects) => {
+    onDone: (choiceText, effects) => {
       applyStat(effects);
-      if (from) state.history.push({ age: state.age, icon:'🛬', text:`结束驻${from}任期，回国` });
-      state.abroad = null;
-      state.abroadYears = 0;
-      state.homeYears = 0;
-      state.retired = true;
-      state.history.push({ age: state.age, icon:'🎖️', text:`从外交部光荣退休，生涯驻外 ${nPost} 国` });
+      if (from) {
+        state.history.push({ age: state.age, icon:'🛬', text:`结束驻${from}任期，回国` });
+        state.abroad = null;
+        state.abroadYears = 0;
+        state.homeYears = 0;
+      }
+      const picked = choices.find(c => c.text === choiceText) || choices[0];
+      if (picked._retire === false) {
+        state.retireDelays++;
+        state.retireAge += 5;
+        state.promo += Math.round(10 * state.promoRate);
+        checkPromotion();
+        state.history.push({ age: state.age, icon:'💼', text:`接受外交部返聘，继续干到 ${state.retireAge} 岁` });
+      } else {
+        state.retired = true;
+        state.history.push({ age: state.age, icon:'🎖️', text:`从外交部光荣退休，生涯驻外 ${nPost} 国` });
+      }
       renderHistory();
       updateDisplay();
       state.isSpinning = false;
@@ -2496,6 +2574,12 @@ function buildLifeSummary(ending, stats, levelTitle) {
   if (state.postings && state.postings.length > 0) {
     careerText += `外交生涯里你先后驻过${state.postings.join('、')}${state.postings.length > 1 ? ' ' + state.postings.length + ' 个国家' : ''}，护照上的每一个章都是故事。`;
     if (state.exDiplomat) careerText += '后来你为了爱情亲手结束了这段生涯，江湖再无你的电报，家里多了一盏为你亮的灯。';
+  }
+  // 退休叙事
+  if (state.retireDelays > 0) {
+    careerText += `到了退休年龄你${state.retireDelays > 1 ? '一而再地' : ''}选择了延迟退休，硬是多干了 ${state.retireDelays * 5} 年——有人说你想不开，你说那叫热爱。`;
+  } else if (state.retired) {
+    careerText += '到点就退，一天不多干，退休后的日子过得比上班还充实。';
   }
 
   // 家庭线
