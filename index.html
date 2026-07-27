@@ -299,7 +299,7 @@
     height: 100%;
     border-radius: 50%;
     position: relative;
-    transition: transform 4s cubic-bezier(0.17, 0.67, 0.32, 1.28);
+    transition: transform 1.6s cubic-bezier(0.17, 0.67, 0.32, 1.28);
     border: 6px solid var(--pixel-white);
     box-shadow: 0 0 0 4px var(--pixel-dark), 0 8px 0 4px var(--pixel-purple);
   }
@@ -401,6 +401,17 @@
     color: var(--pixel-yellow);
     text-shadow: 2px 2px 0 var(--pixel-red);
   }
+
+
+  /* 事件分类配色：职业蓝 / 家庭粉 / 生活绿 */
+  .event-card.cls-work .event-category { color: var(--pixel-blue, #29adff); }
+  .event-card.cls-family .event-category { color: var(--pixel-pink, #ff77a8); }
+  .event-card.cls-life .event-category { color: var(--pixel-green, #00e436); }
+  .event-card.cls-family { box-shadow: 8px 8px 0 var(--pixel-dark), 0 0 0 4px var(--pixel-pink, #ff77a8); }
+  .event-card.cls-work { box-shadow: 8px 8px 0 var(--pixel-dark), 0 0 0 4px #29adff; }
+
+  /* 家庭事件历史条目 */
+  .history-item.family { color: var(--pixel-pink, #ff77a8); }
 
   /* ---- Event Modal ---- */
   .event-modal {
@@ -934,6 +945,29 @@ const GRADUATE_PATHS = {
   },
 };
 
+// ===== 恋爱系统数据 =====
+const PARTNER_NAMES = {
+  f: ['林晚晚','苏念','沈星河','顾一宁','叶知秋','许温言','江采薇','陆清歌','方语汐','宋知意','唐糖','夏栀'],
+  m: ['陈屿','周慕深','徐则言','韩叙','程野','季临风','秦朗','裴聿','霍晏','谢临','阿哲','大力'],
+};
+const PARTNER_TAGS = [
+  { type:'颜值', desc:'美若天仙' }, { type:'颜值', desc:'帅出天际' },
+  { type:'才华', desc:'出口成章' }, { type:'才华', desc:'十项全能' },
+  { type:'温柔', desc:'如沐春风' }, { type:'幽默', desc:'行走的段子手' },
+  { type:'家境', desc:'低调隐豪' }, { type:'厨艺', desc:'米其林级别' },
+  { type:'靠谱', desc:'人间定心丸' }, { type:'有趣', desc:'灵魂有香气' },
+];
+const MEET_SCENES = ['公司团建','朋友的婚礼','读书会','剧本杀局','徒步活动','咖啡店排队','高铁邻座','羽毛球局','摄影展','朋友攒的饭局'];
+const SENIOR_MEET_SCENES = ['老年大学书法班','广场舞队','公园晨练','社区合唱团','门球场'];
+
+function makePartner(senior) {
+  const gender = Math.random() < 0.5 ? 'f' : 'm';
+  const name = PARTNER_NAMES[gender][Math.floor(Math.random() * PARTNER_NAMES[gender].length)];
+  const tag = PARTNER_TAGS[Math.floor(Math.random() * PARTNER_TAGS.length)];
+  const scene = (senior ? SENIOR_MEET_SCENES : MEET_SCENES)[Math.floor(Math.random() * (senior ? SENIOR_MEET_SCENES : MEET_SCENES).length)];
+  return { name, tag, scene, senior: !!senior };
+}
+
 // ===== 事件池 =====
 // 事件字段：minAge/maxAge 年龄窗口；require: fn(state)=>bool 状态门槛；
 // track: 仅该晋升线可见；effects 可含 promo（晋升点数）
@@ -1015,10 +1049,12 @@ const EVENTS = {
   ],
 
   love: [
-    { icon:'💕', title:'心动的信号', desc:'遇到一个聊得来的人，你们开始约会了。', maxAge:45, require: s => !s.married, effects:{ happy:+15, smart:-3 } },
-    { icon:'💔', title:'和平分手', desc:'走不到一起，好聚好散。', maxAge:45, require: s => !s.married, effects:{ happy:-12, smart:+5 } },
-    { icon:'😭', title:'相亲名场面', desc:'长辈安排的相亲，对方开口就问房和车。', minAge:25, maxAge:40, require: s => !s.married, effects:{ happy:-5, smart:+5 } },
-    { icon:'💍', title:'被求婚/求婚成功', desc:'水到渠成，你们决定结婚！', minAge:25, maxAge:42, require: s => !s.married, effects:{ happy:+20, wealth:-8 }, setFlag:'married' },
+    { icon:'🌹', title:'甜蜜约会', desc:'和恋人的一次约会，聊到打烊才走。', require: s => s.dating, effects:{ happy:+10 } },
+    { icon:'🧳', title:'第一次一起旅行', desc:'和恋人来了场双人旅行，更了解彼此了。', require: s => s.dating, effects:{ happy:+12, wealth:-5 } },
+    { icon:'😤', title:'恋爱磨合期', desc:'因为生活习惯吵了一架，又和好了。', require: s => s.dating, effects:{ happy:-5, smart:+5 } },
+    { icon:'👀', title:'见家长', desc:'第一次见对方父母，紧张得同手同脚。', require: s => s.dating, effects:{ happy:+8, smart:+3 } },
+    { icon:'😭', title:'相亲名场面', desc:'长辈安排的相亲，对方开口就问房和车。', minAge:25, maxAge:40, require: s => !s.married && !s.dating, effects:{ happy:-5, smart:+5 } },
+    { icon:'🍜', title:'一人食的自由', desc:'单身的日子也有滋有味，一人火锅真香。', require: s => !s.married && !s.dating, effects:{ happy:+6 } },
     { icon:'💐', title:'纪念日惊喜', desc:'另一半偷偷准备了纪念日惊喜。', require: s => s.married, effects:{ happy:+12, wealth:-3 } },
     { icon:'🥶', title:'婚姻冷战', desc:'因为一件小事冷战了一周。', require: s => s.married, effects:{ happy:-10, smart:+5 } },
     { icon:'🍳', title:'家庭分工大和解', desc:'和另一半重新分了家务，世界和平。', require: s => s.married, effects:{ happy:+10 } },
@@ -1111,11 +1147,11 @@ const EVENTS = {
 // minAge/maxAge 控制出现窗口；require 状态门槛；choice 可 setFlag
 const CROSSROADS = [
   {
-    id:'cr_love', icon:'💘', title:'谈婚论嫁', minAge:24, maxAge:38,
-    require: s => !s.married,
+    id:'cr_love', icon:'💘', title:'谈婚论嫁', minAge:24, maxAge:45,
+    require: s => s.dating && !s.married,
     desc:'感情稳定了，双方父母也见过了。要不要结婚？',
     choices:[
-      { text:'A. 结婚，办一场婚礼', effects:{ wealth:-20, happy:+20 }, setFlag:'married' },
+      { text:'A. 求婚！办一场婚礼', effects:{ wealth:-20, happy:+20 }, setFlag:'married' },
       { text:'B. 领证旅行结婚，不办酒', effects:{ wealth:-5, happy:+15 }, setFlag:'married' },
       { text:'C. 再等等，事业为重', effects:{ career:+5, happy:-5 } },
     ]
@@ -1280,7 +1316,7 @@ const state = {
   career: 50, wealth: 50, happy: 50, smart: 50,
   history: [],
   turnCount: 0,
-  maxTurns: 26,          // 上限 ~100 岁，实际由死亡判定决定
+  maxTurns: 75,          // 一年一轮，上限 ~97 岁，实际由死亡判定决定
   isSpinning: false,
   usedCrossroads: [],
   gradPath: null,
@@ -1297,6 +1333,15 @@ const state = {
   // v3.1 死亡机制
   dead: false,
   deathCause: null,     // 'accident' | 'illness' | 'natural'
+  // v3.2 恋爱系统
+  partner: null,        // { name, tag:{type,desc}, scene, senior }
+  dating: false,        // 恋爱中（未婚）
+  datingYears: 0,
+  breakups: 0,          // 分手次数
+  widowed: false,       // 丧偶
+  marriedYears: 0,
+  spouseTag: null,      // 结婚对象的标签（隐藏结局用）
+  seniorLove: false,    // 黄昏恋标记
 };
 
 const START_BONUS = {
@@ -1454,6 +1499,19 @@ function applyStat(effects) {
   }
 }
 
+// 一年一轮后，普通事件效果按比例缩放（岔路保持原值）
+function scaleEffects(effects, factor) {
+  if (!effects) return effects;
+  const out = {};
+  Object.entries(effects).forEach(([k, v]) => {
+    if (k === 'promo') { out[k] = Math.max(1, Math.round(v * factor)) * Math.sign(v); return; }
+    const sv = Math.round(v * factor);
+    out[k] = sv === 0 && v !== 0 ? Math.sign(v) : sv;
+  });
+  return out;
+}
+const EVENT_SCALE = 0.4;
+
 // ===== 晋升检查 =====
 function checkPromotion() {
   const track = CAREER_TRACKS[state.track];
@@ -1527,14 +1585,14 @@ function spin() {
   const targetIdx = weightedPick(weights);
   const anglePer = 360 / WHEEL_SECTORS.length;
   const targetAngle = targetIdx * anglePer + anglePer / 2;
-  const spins = 5 + Math.floor(Math.random() * 3);
+  const spins = 3 + Math.floor(Math.random() * 2);
   wheelRotation += spins * 360 + (360 - targetAngle - (wheelRotation % 360));
   $('wheelCanvas').style.transform = `rotate(${wheelRotation}deg)`;
 
   setTimeout(() => {
     const sector = WHEEL_SECTORS[targetIdx];
     triggerEvent(sector.key, sector.label);
-  }, 4100);
+  }, 1750);
 }
 
 function getSectorWeights() {
@@ -1575,6 +1633,7 @@ function eligibleEvents(pool) {
 }
 
 // ===== 触发事件 =====
+const CAREER_CATS = ['career','wealth','study'];
 function triggerEvent(categoryKey, categoryLabel) {
   let pool = eligibleEvents(EVENTS[categoryKey]);
   if (pool.length === 0) pool = eligibleEvents(EVENTS.life); // 兜底
@@ -1601,9 +1660,17 @@ function triggerEvent(categoryKey, categoryLabel) {
     return;
   }
 
+  // 事件分类标签：职业事件 / 家庭事件 / 生活事件
+  const cls = CAREER_CATS.includes(categoryKey) ? 'work' : (categoryKey === 'love' ? 'family' : 'life');
+  const clsLabel = { work:'职业事件', family:'家庭事件', life:'生活事件' }[cls];
+  ev._cls = cls;
+
+  // 构建当年的附加事件（恋爱线 + 家庭线）
+  buildYearExtras(categoryKey);
+
   showEventModal({
-    icon: ev.icon, category: categoryLabel, title: ev.title, desc: ev.desc,
-    effects: ev.effects, choices: ev.choices, setFlag: ev.setFlag,
+    icon: ev.icon, category: `${clsLabel} · ${categoryLabel}`, title: ev.title, desc: ev.desc,
+    effects: ev.effects, choices: ev.choices, setFlag: ev.setFlag, evClass: cls,
     onDone: (choiceText, effects, flag) => {
       if (flag) state[flag] = true;
       finishEvent(ev, choiceText, effects, false);
@@ -1619,7 +1686,7 @@ function die(cause) {
   setTimeout(showEnding, 400);
 }
 
-function showEventModal({ icon, category, title, desc, effects, choices, setFlag, onDone, isCrossroad }) {
+function showEventModal({ icon, category, title, desc, effects, choices, setFlag, onDone, isCrossroad, evClass }) {
   $('eventIcon').textContent = icon;
   $('eventCategory').textContent = (isCrossroad ? '🔀 人生岔路 · ' : '') + category.toUpperCase();
   $('eventTitle').textContent = title;
@@ -1627,6 +1694,8 @@ function showEventModal({ icon, category, title, desc, effects, choices, setFlag
 
   const card = $('eventModal').querySelector('.event-card');
   card.classList.toggle('crossroad', !!isCrossroad);
+  card.classList.remove('cls-work','cls-family','cls-life');
+  if (evClass) card.classList.add('cls-' + evClass);
 
   const effectsBox = $('eventEffects');
   const choicesBox = $('eventChoices');
@@ -1681,21 +1750,210 @@ function renderEffects(effects, container) {
 }
 
 function finishEvent(ev, choiceText, effects, isCrossroad) {
-  applyStat(effects);
-  // 资历自然增长：每过一轮攒一点晋升点数
-  state.promo += Math.round(3 * state.promoRate);
+  // 普通事件效果折半（一年一轮），岔路保持原值
+  applyStat(isCrossroad ? effects : scaleEffects(effects, EVENT_SCALE));
+  // 资历自然增长
+  state.promo += Math.round(1.5 * state.promoRate);
   checkPromotion();
   const summary = choiceText ? `${ev.title}（${choiceText.replace(/^[ABC]\. /, '')}）` : ev.title;
-  state.history.push({ age: state.age, icon: ev.icon, text: summary });
+  state.history.push({ age: state.age, icon: ev.icon, text: summary, cls: ev._cls });
   renderHistory();
-  state.age += 3;
+  updateDisplay();
+  processYearQueue();
+}
+
+// ===== 年度事件队列 =====
+// 一年内可以发生多个事件：主事件（转盘）→ 恋爱线事件 → 家庭附加事件 → 年终结算
+let yearQueue = [];
+
+function processYearQueue() {
+  if (state.dead) return;
+  if (yearQueue.length > 0) {
+    const job = yearQueue.shift();
+    job();
+  } else {
+    endYear();
+  }
+}
+
+function buildYearExtras(mainCategoryKey) {
+  yearQueue = [];
+  // 1. 恋爱线生命周期
+  const loveJob = buildLoveLifecycle();
+  if (loveJob) yearQueue.push(loveJob);
+  // 2. 已婚/有娃：30% 概率同年再来一个家庭事件（主事件不是家庭类才给）
+  if (mainCategoryKey !== 'love' && (state.married || state.hasKid) && Math.random() < 0.3) {
+    const pool = eligibleEvents(EVENTS.love).filter(e => !e.fatal);
+    if (pool.length) {
+      const ev = pool[Math.floor(Math.random() * pool.length)];
+      yearQueue.push(() => {
+        ev._cls = 'family';
+        showEventModal({
+          icon: ev.icon, category: '家庭事件', title: ev.title, desc: ev.desc,
+          effects: ev.effects, choices: ev.choices, setFlag: ev.setFlag, evClass:'family',
+          onDone: (choiceText, effects, flag) => {
+            if (flag) state[flag] = true;
+            applyStat(scaleEffects(effects, EVENT_SCALE));
+            const summary = choiceText ? `${ev.title}（${choiceText.replace(/^[ABC]\. /, '')}）` : ev.title;
+            state.history.push({ age: state.age, icon: ev.icon, text: summary, cls:'family' });
+            renderHistory();
+            updateDisplay();
+            processYearQueue();
+          }
+        });
+      });
+    }
+  }
+}
+
+// ===== 恋爱生命周期 =====
+function buildLoveLifecycle() {
+  // --- 单身 → 邂逅 ---
+  if (!state.dating && !state.married && !state.partner) {
+    const youngSingle = state.age >= 20 && state.age <= 45;
+    const seniorSingle = state.age >= 62 && (state.widowed || !state.married);
+    const chance = youngSingle ? 0.35 : (seniorSingle ? 0.22 : 0);
+    if (chance > 0 && Math.random() < chance) {
+      const partner = makePartner(state.age >= 62);
+      return () => {
+        showEventModal({
+          icon: partner.senior ? '🌇' : '💘',
+          category: '家庭事件 · 邂逅',
+          title: partner.senior ? '黄昏里的相遇' : '怦然心动',
+          desc: `你参加${partner.scene}时，遇到了${partner.name}（${partner.tag.type}：${partner.tag.desc}）。聊了几句，感觉很不一样。`,
+          choices: [
+            { text: 'A. 主动出击，认识一下', effects: { happy:+8 } },
+            { text: 'B. 缘分随风，保持距离', effects: { smart:+3 } },
+          ],
+          evClass: 'family',
+          onDone: (choiceText, effects) => {
+            applyStat(effects);
+            if (choiceText && choiceText.startsWith('A')) {
+              state.partner = partner;
+              state.dating = true;
+              state.datingYears = 0;
+              if (partner.senior) state.seniorLove = true;
+              state.history.push({ age: state.age, icon:'💘', text:`在${partner.scene}遇到了${partner.name}（${partner.tag.type}：${partner.tag.desc}），开始交往`, cls:'family' });
+            } else {
+              state.history.push({ age: state.age, icon:'🍂', text:`与${partner.name}擦肩而过`, cls:'family' });
+            }
+            renderHistory();
+            updateDisplay();
+            processYearQueue();
+          }
+        });
+      };
+    }
+    return null;
+  }
+
+  // --- 恋爱中 → 修成正果 / 感情破裂 / 继续 ---
+  if (state.dating && state.partner) {
+    const p = state.partner;
+    const marryChance = Math.min(0.7, 0.25 + state.datingYears * 0.15);
+    const breakChance = 0.15;
+    const roll = Math.random();
+    if (state.datingYears >= 1 && roll < marryChance) {
+      return () => {
+        showEventModal({
+          icon: p.senior ? '🌅' : '💍',
+          category: '家庭事件 · 修成正果',
+          title: p.senior ? '黄昏恋修成正果' : `${p.name}答应了！`,
+          desc: p.senior
+            ? `和${p.name}相伴的日子很踏实。你们决定领证，搭伙过好剩下的日子。`
+            : `爱情长跑 ${state.datingYears} 年，你们决定结婚！${p.name}（${p.tag.type}：${p.tag.desc}）从此是你的家人。`,
+          choices: [
+            { text: 'A. 办一场热闹的婚礼', effects: { wealth:-15, happy:+18 } },
+            { text: 'B. 领证旅行，简单就好', effects: { wealth:-3, happy:+14 } },
+          ],
+          evClass: 'family',
+          onDone: (choiceText, effects) => {
+            applyStat(effects);
+            marry();
+            state.history.push({ age: state.age, icon:'💍', text:`和${p.name}结婚了！`, cls:'family' });
+            renderHistory();
+            updateDisplay();
+            processYearQueue();
+          }
+        });
+      };
+    }
+    if (roll < marryChance + breakChance) {
+      return () => {
+        showEventModal({
+          icon: '💔',
+          category: '家庭事件 · 感情破裂',
+          title: '走散了',
+          desc: `和${p.name}的感情在琐碎和分歧里磨没了。你们和平分手，各自安好。`,
+          effects: { happy:-10, smart:+4 },
+          evClass: 'family',
+          onDone: (_, effects) => {
+            applyStat(effects);
+            state.history.push({ age: state.age, icon:'💔', text:`和${p.name}分手了`, cls:'family' });
+            state.partner = null;
+            state.dating = false;
+            state.datingYears = 0;
+            state.breakups++;
+            renderHistory();
+            updateDisplay();
+            processYearQueue();
+          }
+        });
+      };
+    }
+    return null; // 平稳恋爱中
+  }
+
+  // --- 已婚 → 丧偶判定（65 岁起）---
+  if (state.married && state.age >= 65 && !state.widowed) {
+    const widowChance = Math.min(0.25, 0.03 + (state.age - 65) * 0.012);
+    if (Math.random() < widowChance) {
+      const pname = state.partner ? state.partner.name : '老伴';
+      return () => {
+        showEventModal({
+          icon: '🕯️',
+          category: '家庭事件 · 离别',
+          title: '老伴走了',
+          desc: `${pname}先走一步。收拾遗物时，你在抽屉里找到了你们年轻时的合影。`,
+          effects: { happy:-18, smart:+5 },
+          evClass: 'family',
+          onDone: (_, effects) => {
+            applyStat(effects);
+            state.history.push({ age: state.age, icon:'🕯️', text:`${pname}离世，你送走了人生挚爱`, cls:'family' });
+            state.married = false;
+            state.widowed = true;
+            state.partner = null;
+            renderHistory();
+            updateDisplay();
+            processYearQueue();
+          }
+        });
+      };
+    }
+  }
+  return null;
+}
+
+function marry() {
+  state.married = true;
+  state.dating = false;
+  state.marriedYears = 0;
+  if (state.partner) state.spouseTag = state.partner.tag;
+  if (state.partner && state.partner.senior) state.seniorLove = true;
+  state.widowed = false;
+}
+
+// ===== 年终结算 =====
+function endYear() {
+  state.age += 1;
   state.turnCount++;
+  if (state.dating) state.datingYears++;
+  if (state.married) state.marriedYears++;
   updateDisplay();
 
-  // ---- 自然死亡判定：76 岁起，每轮概率随年龄递增 ----
+  // 自然死亡判定：76 岁起逐年上升
   if (state.age >= 76) {
-    // 76岁:25% → 79:35% → 82:50% → 85:65% → 88:80% → 91+:95%
-    const p = Math.min(0.95, 0.25 + (state.age - 76) / 3 * 0.15);
+    const p = Math.min(0.5, 0.08 + (state.age - 76) * 0.045);
     if (Math.random() < p || state.turnCount >= state.maxTurns) {
       die('natural');
       return;
@@ -1706,8 +1964,9 @@ function finishEvent(ev, choiceText, effects, isCrossroad) {
     return;
   }
 
-  if (!isCrossroad && state.turnCount % 3 === 0) {
-    setTimeout(triggerCrossroad, 500);
+  // 人生岔路：每 4 年一次
+  if (state.turnCount % 4 === 0) {
+    setTimeout(triggerCrossroad, 400);
   } else {
     state.isSpinning = false;
     $('spinBtn').disabled = false;
@@ -1738,15 +1997,25 @@ function triggerCrossroad() {
     choices: cr.choices,
     isCrossroad: true,
     onDone: (choiceText, effects, flag) => {
-      if (flag) state[flag] = true;
-      finishEvent(cr, choiceText, effects, true);
+      if (flag) {
+        state[flag] = true;
+        if (flag === 'married') marry();
+      }
+      applyStat(effects);
+      const summary = choiceText ? `${cr.title}（${choiceText.replace(/^[ABC]\. /, '')}）` : cr.title;
+      state.history.push({ age: state.age, icon: cr.icon, text: summary });
+      renderHistory();
+      updateDisplay();
+      // 岔路不占一年，直接解锁转盘
+      state.isSpinning = false;
+      $('spinBtn').disabled = false;
     }
   });
 }
 
 function renderHistory() {
   $('historyList').innerHTML = state.history.slice().reverse().map(h =>
-    `<div class="history-item${h.isPromo ? ' promo' : ''}"><span class="history-age">${h.age}岁</span> ${h.icon} ${h.text}</div>`
+    `<div class="history-item${h.isPromo ? ' promo' : ''}${h.cls === 'family' ? ' family' : ''}"><span class="history-age">${h.age}岁</span> ${h.icon} ${h.text}</div>`
   ).join('');
 }
 
@@ -1766,6 +2035,18 @@ function showEnding() {
     ending = { tag:'天妒英才', desc:`人生本来还有无限可能，却在 ${state.age} 岁戛然而止。愿来世平安顺遂。` };
   } else if (state.deathCause === 'illness' && state.age < 65) {
     ending = { tag:'英年早逝', desc:`病魔无情。${state.age} 岁的你带着未完成的心愿离开了。` };
+  } else if (state.seniorLove && (state.married || state.widowed) && state.age >= 70) {
+    // 隐藏结局：黄昏恋
+    ending = { tag:'🌅 夕阳无限好', desc:'谁说爱情只属于年轻人？你在人生的黄昏遇到了对的人，最后的岁月被温柔填满。', hidden:true };
+  } else if (state.spouseTag && state.spouseTag.type === '颜值' && state.marriedYears >= 30 && state.happy >= 70) {
+    // 隐藏结局：神仙眷侣
+    ending = { tag:'💫 神仙眷侣', desc:`和${state.spouseTag.desc}的爱人携手 ${state.marriedYears} 年，你们是朋友圈里永远的模范夫妻。`, hidden:true };
+  } else if (state.marriedYears >= 40) {
+    // 隐藏结局：白头偕老
+    ending = { tag:'👴👵 白头偕老', desc:`一段婚姻走了 ${state.marriedYears} 年。所谓爱情最好的样子，就是一起慢慢变老。`, hidden:true };
+  } else if (state.breakups >= 3) {
+    // 隐藏结局：情场浪子
+    ending = { tag:'🃏 情场浪子', desc:`${state.breakups} 段感情无疾而终。爱过、痛过、潇洒过，你的故事够写一本书。`, hidden:true };
   } else {
     for (const e of ENDINGS) {
       if (e.minCareer && c >= e.minCareer) { ending = e; break; }
@@ -1846,10 +2127,19 @@ function buildLifeSummary(ending, stats, levelTitle) {
 
   // 家庭线
   let familyText = '';
-  if (state.married && state.hasKid) {
-    familyText = '你组建了自己的家庭，有伴侣也有孩子，热闹和鸡飞狗跳都是生活的注脚。';
-  } else if (state.married) {
-    familyText = '你和爱人携手走过了大半生，两个人的世界安静而自在。';
+  const spouseName = state.partner ? state.partner.name : null;
+  if (state.married || state.widowed || state.marriedYears > 0) {
+    const tagStr = state.spouseTag ? `（${state.spouseTag.type}：${state.spouseTag.desc}）` : '';
+    if (state.widowed) {
+      familyText = `你曾拥有一段 ${state.marriedYears} 年的婚姻${tagStr ? '，爱人' + tagStr : ''}，虽然最后送走了对方，但那些相伴的岁月是你最珍贵的收藏。`;
+    } else if (spouseName) {
+      familyText = `你和${spouseName}${tagStr}携手走过 ${state.marriedYears} 年。`;
+    } else {
+      familyText = `你的婚姻走过了 ${state.marriedYears} 年。`;
+    }
+    if (state.hasKid) familyText += '孩子的欢笑和鸡飞狗跳都是生活的注脚。';
+  } else if (state.breakups > 0) {
+    familyText = `${state.breakups} 段感情最终都没能走到最后，但每一段都让你更懂得爱与被爱。`;
   } else {
     familyText = '你没有走进婚姻，一个人把日子过成了自己喜欢的样子。';
   }
